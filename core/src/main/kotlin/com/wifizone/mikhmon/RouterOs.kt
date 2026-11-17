@@ -13,7 +13,7 @@ import java.net.Socket
 import java.security.MessageDigest
 
 class RouterOsException(val kind: Kind, message: String) : IOException(message) {
-    enum class Kind { UNREACHABLE, API_DISABLED, BAD_LOGIN, PROTOCOL }
+    enum class Kind { UNREACHABLE, API_DISABLED, BAD_LOGIN, PROTOCOL, CONNECTION }
 }
 
 /** Client minimal de l'API RouterOS (port 8728), suffisant pour tester la connexion et lire la config. */
@@ -125,7 +125,7 @@ class RouterOs private constructor(private val socket: Socket) : Closeable {
         } catch (e: RouterOsException) { throw e
         } catch (e: IOException) {
             throw RouterOsException(
-                if (loginPhase) RouterOsException.Kind.BAD_LOGIN else RouterOsException.Kind.PROTOCOL,
+                if (loginPhase) RouterOsException.Kind.BAD_LOGIN else RouterOsException.Kind.CONNECTION,
                 "Le routeur a coupé la connexion : ${e.message}")
         }
     }

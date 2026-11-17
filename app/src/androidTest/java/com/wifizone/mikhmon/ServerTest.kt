@@ -65,7 +65,7 @@ class ServerTest {
 
             val dash = http("http://127.0.0.1:$port/?session=Mon-Routeur")
             assertTrue("Tableau de bord sans données du routeur :\n${dash.take(3000)}\n${MikhmonServer.report()}",
-                dash.contains("hAP-fake"))
+                dash.contains("hAP ac"))
         }
     }
 

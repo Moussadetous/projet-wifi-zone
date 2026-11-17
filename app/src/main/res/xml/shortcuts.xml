@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="tickets" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_tickets" android:shortcutLongLabel="@string/sc_tickets_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.wifizone.mikhmon" android:targetClass="com.wifizone.mikhmon.MainActivity">
+            <extra android:name="open" android:value="tickets" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="clients" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_clients" android:shortcutLongLabel="@string/sc_clients">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.wifizone.mikhmon" android:targetClass="com.wifizone.mikhmon.MainActivity">
+            <extra android:name="open" android:value="clients" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="trafic" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_traffic" android:shortcutLongLabel="@string/sc_traffic">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.wifizone.mikhmon" android:targetClass="com.wifizone.mikhmon.MainActivity">
+            <extra android:name="open" android:value="trafic" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="journal" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_logs" android:shortcutLongLabel="@string/sc_logs">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.wifizone.mikhmon" android:targetClass="com.wifizone.mikhmon.MainActivity">
+            <extra android:name="open" android:value="journal" />
+        </intent>
+    </shortcut>
+</shortcuts>

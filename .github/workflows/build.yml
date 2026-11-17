@@ -56,12 +56,48 @@ jobs:
           done
       - name: Télécharger Mikhmon
         run: ./scripts/fetch-mikhmon.sh
+      # Clé de signature stable : secret du dépôt si présent (recommandé), sinon clé gardée en cache.
+      - name: Clé de signature (cache)
+        uses: actions/cache@v4
+        with:
+          path: ~/.mikhmon-signing
+          key: mikhmon-signing-v1
+      - name: Clé de signature
+        env:
+          KS_B64: ${{ secrets.MIKHMON_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.MIKHMON_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p ~/.mikhmon-signing
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS_B64" | base64 -d > ~/.mikhmon-signing/secret.jks
+            echo "MIKHMON_KEYSTORE=$HOME/.mikhmon-signing/secret.jks" >> $GITHUB_ENV
+            echo "MIKHMON_KEYSTORE_PASSWORD=$KS_PASS" >> $GITHUB_ENV
+            echo "Signature : clé du secret MIKHMON_KEYSTORE_B64"
+          else
+            if [ ! -f ~/.mikhmon-signing/ci.jks ]; then
+              keytool -genkeypair -keystore ~/.mikhmon-signing/ci.jks -storepass mikhmon-ci-key -keypass mikhmon-ci-key \
+                -alias mikhmon -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Mikhmon Android, O=WiFi Zone"
+            fi
+            echo "MIKHMON_KEYSTORE=$HOME/.mikhmon-signing/ci.jks" >> $GITHUB_ENV
+            echo "MIKHMON_KEYSTORE_PASSWORD=mikhmon-ci-key" >> $GITHUB_ENV
+            echo "Signature : clé de la CI (ajoutez le secret MIKHMON_KEYSTORE_B64 pour une clé définitive)"
+          fi
       - name: Tests unitaires + APK
-        run: gradle --no-daemon :core:test :app:assembleDebug :app:assembleDebugAndroidTest
+        run: gradle --no-daemon :core:test :app:assembleDebug :app:assembleRelease :app:assembleDebugAndroidTest
+      - name: Préparer les APK
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/Mikhmon-Android.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Mikhmon-Android-debug.apk
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mikhmon-apk
+          path: dist/Mikhmon-Android.apk
       - uses: actions/upload-artifact@v4
         with:
           name: mikhmon-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: dist/Mikhmon-Android-debug.apk
       - name: Activer KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -79,14 +115,15 @@ jobs:
           script: |
             gradle --no-daemon :app:connectedDebugAndroidTest || touch tests-failed
             adb logcat -d > logcat.txt || true
-            mkdir -p screens && for n in 1-configuration 2-demarrage 3-mikhmon; do adb pull /data/local/tmp/mikhmon-$n.png screens/ || true; done
+            mkdir -p screens && for f in $(adb shell ls /data/local/tmp/ | tr -d '\r' | grep '^mikhmon-.*png$'); do adb pull /data/local/tmp/$f screens/ || true; done
             test ! -f tests-failed
-      - name: Captures d'écran (journal)
+      - name: Rapport PDF et captures (journal)
         if: always()
         run: |
+          grep -h "page(s)," logcat.txt | sed 's/.*System.out: //' | sort -u | head -80 || true
           for f in screens/*.png; do
             [ -f "$f" ] || continue
-            convert "$f" -resize 40% -quality 70 "${f%.png}.jpg" || cp "$f" "${f%.png}.jpg"
+            convert "$f" -resize 36% -quality 68 "${f%.png}.jpg" || cp "$f" "${f%.png}.jpg"
             echo "SCREENSHOT-BEGIN $f"; base64 -w 0 "${f%.png}.jpg"; echo; echo "SCREENSHOT-END"
           done
       - name: Rapports de test

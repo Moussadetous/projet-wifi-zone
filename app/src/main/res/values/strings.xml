@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Mikhmon</string>
+    <string name="sc_tickets">Générer des tickets</string>
+    <string name="sc_tickets_long">Générer et imprimer des tickets</string>
+    <string name="sc_clients">Clients connectés</string>
+    <string name="sc_traffic">Trafic en direct</string>
+    <string name="sc_logs">Journal du routeur</string>
+</resources>
