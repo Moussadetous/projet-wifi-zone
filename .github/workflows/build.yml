@@ -75,7 +75,20 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          script: gradle --no-daemon :app:connectedDebugAndroidTest || (adb logcat -d > logcat.txt; adb shell run-as com.wifizone.mikhmon cat files/php-server.log > php-server.log; exit 1)
+          profile: pixel_6
+          script: |
+            gradle --no-daemon :app:connectedDebugAndroidTest || touch tests-failed
+            adb logcat -d > logcat.txt || true
+            mkdir -p screens && for n in 1-configuration 2-demarrage 3-mikhmon; do adb pull /data/local/tmp/mikhmon-$n.png screens/ || true; done
+            test ! -f tests-failed
+      - name: Captures d'écran (journal)
+        if: always()
+        run: |
+          for f in screens/*.png; do
+            [ -f "$f" ] || continue
+            convert "$f" -resize 40% -quality 70 "${f%.png}.jpg" || cp "$f" "${f%.png}.jpg"
+            echo "SCREENSHOT-BEGIN $f"; base64 -w 0 "${f%.png}.jpg"; echo; echo "SCREENSHOT-END"
+          done
       - name: Rapports de test
         if: always()
         uses: actions/upload-artifact@v4
@@ -86,4 +99,4 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             logcat.txt
-            php-server.log
+            screens/

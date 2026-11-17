@@ -32,7 +32,7 @@ import org.json.JSONObject
 
 /** Démarre Mikhmon et l'affiche, déjà connecté, dans le navigateur intégré. */
 class MainActivity : AppCompatActivity() {
-    private lateinit var web: WebView
+    internal lateinit var web: WebView
     private lateinit var overlay: LinearLayout
     private lateinit var spinner: ProgressBar
     private lateinit var message: TextView
