@@ -27,7 +27,7 @@ class RibbonTemplate(id: String, name: String, palette: Palette, private val con
         // confettis (toujours les mêmes pour un modèle donné)
         var seed = id.hashCode().toLong() and 0x7fffffff
         fun rnd(): Float { seed = (seed * 1103515245 + 12345) and 0x7fffffff; return (seed % 10000) / 10000f }
-        repeat(160) {
+        repeat(90) {
             val x = rnd() * w; val y = rnd() * h
             // confettis seulement sur les bords : le texte reste parfaitement lisible
             val edge = y < 12f || y > h - 8f || x > w - 14f || (x < 14f && y > 90f)
@@ -61,7 +61,7 @@ class RibbonTemplate(id: String, name: String, palette: Palette, private val con
                 pts[i * 2] = sealX + rr * cos(a); pts[i * 2 + 1] = sealY + rr * sin(a)
             }
             c.fill(VPath().polygon(*pts), Linear(sealX - 38f, sealY - 38f, sealX + 38f, sealY + 38f, intArrayOf(p.accent, Colors.darken(p.accent, 0.2f))))
-            c.stroke(VPath.circle(sealX, sealY, 27f), Colors.alpha(Colors.onColor(p.accent), 0.5f), Stroke(0.8f, floatArrayOf(2f, 2f)))
+            c.stroke(VPath.circle(sealX, sealY, 27f), Colors.alpha(Colors.onColor(p.accent), 0.45f), Stroke(0.8f))
             val parts = price.split(" ")
             val amount = parts.dropLast(1).joinToString(" ").ifBlank { price }
             val on = Colors.onColor(p.accent)

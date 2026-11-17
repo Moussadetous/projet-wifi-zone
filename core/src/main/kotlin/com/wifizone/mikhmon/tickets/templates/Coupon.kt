@@ -20,7 +20,8 @@ class CouponTemplate(id: String, name: String, palette: Palette) :
     override fun draw(t: TicketContext) {
         val c = t.c; val p = t.p
         c.fill(VPath.round(0f, 0f, w, h, 8f), Solid(p.bg))
-        Kit.dots(c, 0f, 0f, w, h, 6f, 0.45f, Colors.alpha(p.text, 0.06f))
+        // Papier : léger dégradé (une seule forme, PDF léger).
+        c.fill(VPath.round(0f, 0f, w, h, 8f), com.wifizone.mikhmon.tickets.gfx.Linear(0f, 0f, w, h, intArrayOf(Colors.lighten(p.bg, 0.25f), p.bg)))
         // bordure à découper
         c.stroke(VPath.round(7f, 7f, w - 14f, h - 14f, 6f), Colors.alpha(p.text, 0.55f), Stroke(1.2f, floatArrayOf(5f, 4f), round = false))
         c.fill(VPath.rect(18f, 1f, 22f, 12f), Solid(p.bg))

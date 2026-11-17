@@ -127,7 +127,7 @@ fun PurchaseDialogs(p: Purchase) {
 
 /** Accès à l'application : compte obligatoire, puis essai gratuit ou accès à vie. */
 @Composable
-fun Gate(activity: Activity, acc: com.wifizone.mikhmon.account.MproCore.Account?, onRouterSettings: () -> Unit) {
+fun Gate(activity: Activity, acc: com.wifizone.mikhmon.account.MproCore.Account?, onRouterSettings: () -> Unit, onSkip: (() -> Unit)? = null) {
     val scope = rememberCoroutineScope()
     val p = remember { Purchase(activity, scope) }
     var connecting by remember { mutableStateOf(false) }
@@ -161,6 +161,10 @@ fun Gate(activity: Activity, acc: com.wifizone.mikhmon.account.MproCore.Account?
                     }
                 }
                 discoverError?.let { Spacer(Modifier.height(12.dp)); ErrorNote(it) }
+                val grace = remember { Services.account.graceDaysLeft() }
+                if (onSkip != null && grace > 0) {
+                    TextButton(onSkip) { Text("Continuer sans compte pour l'instant (encore $grace jour${if (grace > 1) "s" else ""})", color = Brand.Muted, textAlign = TextAlign.Center) }
+                }
             }
             acc.status == "blocked" -> {
                 Text("Accès suspendu", style = MaterialTheme.typography.headlineMedium)

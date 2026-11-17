@@ -81,4 +81,5 @@ class MproClient(
     suspend fun cancelPending() = withContext(Dispatchers.IO) { core.cancelPending() }
     suspend fun logout() = withContext(Dispatchers.IO) { core.logout() }
     fun seedForTests(json: String?) = core.seedForTests(json)
+    fun graceDaysLeft() = core.graceDaysLeft()
 }

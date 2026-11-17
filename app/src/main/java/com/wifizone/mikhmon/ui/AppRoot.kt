@@ -83,6 +83,7 @@ fun AppRoot(activity: Activity) {
     val account by Services.account.account.collectAsState()
     val scope = rememberCoroutineScope()
     var gateChecked by rememberSaveable { mutableStateOf(false) }
+    var skipGate by rememberSaveable { mutableStateOf(false) }
 
     // Serveur Mikhmon (PHP) toujours prêt en arrière-plan.
     LaunchedEffect(Unit) { MikhmonService.start(activity) }
@@ -149,9 +150,9 @@ fun AppRoot(activity: Activity) {
 
     // Accès : connexion au compte obligatoire, puis essai ou accès à vie.
     val acc = account
-    val locked = gateChecked && (acc == null || !acc.unlocked)
+    val locked = gateChecked && !(skipGate && acc == null) && (acc == null || !acc.unlocked)
     if (locked && nav.overlay !is Overlay.Setup) {
-        Gate(activity, acc, onRouterSettings = { nav.open(Overlay.Setup) })
+        Gate(activity, acc, onRouterSettings = { nav.open(Overlay.Setup) }, onSkip = { skipGate = true })
         return
     }
 

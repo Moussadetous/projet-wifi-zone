@@ -167,7 +167,7 @@ fun TicketsScreen(activity: Activity, nav: Nav) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf(10, 50, 100).forEach { n -> SelectChip("$n", qty == n) { qty = n } } }
             }
             Spacer(Modifier.height(16.dp))
-            Segmented(listOf("Code unique", "Utilisateur + mot de passe"), if (userPass) 1 else 0, { userPass = it == 1 })
+            Segmented(listOf("Code unique", "Code + mot de passe"), if (userPass) 1 else 0, { userPass = it == 1 })
             Spacer(Modifier.height(14.dp))
             Text("Longueur du code : $length caractères", fontWeight = FontWeight.SemiBold)
             Slider(length.toFloat(), { length = it.toInt() }, valueRange = 4f..10f, steps = 5)

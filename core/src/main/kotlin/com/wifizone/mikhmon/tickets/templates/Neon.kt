@@ -24,7 +24,6 @@ class NeonTemplate(id: String, name: String, palette: Palette) :
         c.fill(body, Solid(p.bg))
         c.fill(VPath.rect(0f, 0f, w, h), Radial(w * 0.2f, h * 0.1f, 220f, intArrayOf(Colors.alpha(p.primary, 0.20f), Colors.alpha(p.primary, 0f))))
         c.fill(VPath.rect(0f, 0f, w, h), Radial(w * 0.95f, h, 200f, intArrayOf(Colors.alpha(p.accent, 0.18f), Colors.alpha(p.accent, 0f))))
-        Kit.dots(c, 0f, 0f, w, h, 11f, 0.7f, Colors.alpha(Colors.WHITE, 0.05f))
         c.restore()
         // cadre néon
         Kit.glow(c, VPath.round(9f, 9f, w - 18f, h - 18f, 11f), p.primary, 1.6f, 3.5f)

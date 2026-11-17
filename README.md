@@ -1,35 +1,43 @@
-# MikhmonDroid
+# Mikhmon Android
 
-Mikhmon v3 tout-en-un sur Android, sans Termux.
+Mikhmon v3 tout-en-un sur Android, sans Termux, avec un tableau de contrôle natif et des tickets premium.
 
 ## Pour l'utilisateur
-1. Connectez le téléphone au Wi-Fi du MikroTik.
-2. Ouvrez l'application : l'adresse du routeur est détectée automatiquement.
-3. Entrez l'utilisateur et le mot de passe du routeur (ceux de Winbox) → **Se connecter**.
-4. Mikhmon s'ouvre, déjà connecté. Aux lancements suivants, il s'ouvre directement.
+1. Connectez le téléphone au Wi-Fi du MikroTik et ouvrez l'application : l'adresse du routeur est détectée.
+2. Tapez seulement l'utilisateur et le mot de passe du routeur (ceux de Winbox) → **Se connecter**.
+3. Connectez votre compte MPro (Google ou e-mail) : si le navigateur du téléphone est déjà connecté à la boutique,
+   il est reconnu tout seul. **7 jours d'essai**, puis **accès à vie** payé une fois (lié au compte, tous appareils).
 
-Le nom du routeur, le hotspot et son nom DNS sont lus sur le routeur ; la devise vient de la langue du téléphone.
-Le compte administrateur Mikhmon est généré et utilisé automatiquement.
+## Ce que fait l'application
+- **Accueil** : état du routeur en direct (clients connectés, débit, processeur, mémoire, ventes du jour), raccourcis.
+- **Clients** : connectés en direct (appareil, IP, MAC, débit, consommation, temps restant), déconnexion ;
+  tickets (recherche, filtres, désactiver, supprimer, imprimer).
+- **Trafic** : courbe en direct par interface, plus gros consommateurs.
+- **Journal** : connexions, échecs, système, ventes Mikhmon du jour et du mois.
+- **Tickets** : génération en quelques touches, au format Mikhmon (lots `vc-…`/`up-…`, profils, prix, validité) ;
+  impression **Mikhmon standard** ou **Studio premium**.
+- **Studio premium** : 46 modèles (dont 2 gratuits), couleurs, textes, motif ou logo, QR de connexion automatique,
+  icônes, papier A4 / A5 / Lettre / rouleaux 58 et 80 mm, **export PDF natif** dans Téléchargements/Mikhmon.
+  Chaque modèle premium s'achète une fois (prix réglé sur la boutique).
+- **Mikhmon** : l'interface d'origine complète, déjà connectée.
+- Raccourcis sur l'icône (appui long) : générer des tickets, clients, trafic, journal.
 
 ## Comment ça marche
-Android est un système Linux : l'application contient un **PHP compilé pour Android** (`libphp.so`,
-seul emplacement d'où Android autorise l'exécution) et les fichiers de **Mikhmon**. Au démarrage, le service
-`MikhmonService` lance `php -S 127.0.0.1:<port>` comme un processus normal — exactement ce que fait Termux, sans Termux.
-Le navigateur intégré (WebView) affiche alors Mikhmon et s'y connecte tout seul.
-
-Mikhmon joint le routeur via un **pont interne** (`RouterBridge`) dont les connexions sont forcées sur le Wi-Fi :
-ça marche même si le Wi-Fi du MikroTik n'a pas internet et que les données mobiles sont actives.
-
-En cas de problème, l'application affiche la cause (ex. « service API désactivé », « mot de passe incorrect »,
-« PHP s'est arrêté : SIGSYS ») et un rapport de diagnostic copiable.
+- Android est un Linux : l'APK contient un **PHP compilé pour Android** (`libphp.so`) et **Mikhmon**. Le service
+  `MikhmonService` lance `php -S 127.0.0.1:<port>` ; le pont `RouterBridge` force la connexion au routeur sur le Wi-Fi.
+- Les écrans natifs parlent directement au routeur par l'API RouterOS (`core/RouterOs.kt`).
+- **Tickets** (`core/tickets`) : dessin vectoriel indépendant de la plateforme → aperçu, PDF (PdfDocument) et tests
+  (Java2D). Polices libres embarquées (Inter, JetBrains Mono, Caladea).
+- **Compte** (`core/account/MproCore.kt`) : connexion par la page `/connexion-app/` de la boutique MPro (PKCE),
+  jeton de l'application, essai, accès à vie, achats « en un geste » (le solde paie ; sinon recharge Chariow et l'achat
+  se termine tout seul). L'adresse de la boutique est découverte (`mprodigital.shop`, puis l'adresse Cloudflare) et suit
+  l'« adresse principale » réglée dans l'administration de la boutique.
 
 ## Structure
-- `core/` : logique pure Kotlin testée sur JVM (format `config.php` de Mikhmon, client API RouterOS, pont, patch Mikhmon).
-- `app/` : application Android (écrans, service, exécution de PHP) + test sur émulateur (`ServerTest`).
-- `scripts/build-php-android.sh` : compile PHP avec le NDK Android (bionic).
-- `scripts/fetch-mikhmon.sh` : récupère Mikhmon v3 (GPL v2) à une version figée.
+- `core/` : logique pure Kotlin testée sur ordinateur (Mikhmon, RouterOS, tickets, compte).
+- `app/` : application Compose, service PHP, export PDF, tests sur émulateur (écrans, PDF, serveur Mikhmon).
+- `scripts/build-php-android.sh` : PHP pour Android (NDK) · `scripts/fetch-mikhmon.sh` : Mikhmon v3 (GPL v2).
 
 ## Compiler
-La CI GitHub Actions (`.github/workflows/build.yml`) compile PHP, construit l'APK et le teste dans un émulateur.
-En local : `scripts/build-php-android.sh arm64-v8a out/php/arm64-v8a`, copier `libphp.so` dans
-`app/src/main/jniLibs/arm64-v8a/`, puis `scripts/fetch-mikhmon.sh` et `gradle :app:assembleDebug`.
+La CI (`.github/workflows/build.yml`) compile PHP, construit l'APK signée, la teste sur un émulateur Android 14 et
+publie l'artefact **mikhmon-apk**. Signature stable : secrets `MIKHMON_KEYSTORE_B64` et `MIKHMON_KEYSTORE_PASSWORD`.

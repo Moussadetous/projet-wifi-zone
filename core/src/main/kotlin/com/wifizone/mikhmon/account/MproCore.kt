@@ -63,6 +63,15 @@ class MproCore(
     private var current: Account? = cached()
     val account get() = current
 
+    init { if (prefs.get("first_seen") == null) prefs.put("first_seen", now().toString()) }
+
+    /** Jours restants pour utiliser l'application avant la première connexion (pas d'internet, boutique pas encore à jour…). */
+    fun graceDaysLeft(days: Int = 3): Int {
+        val first = prefs.get("first_seen")?.toLongOrNull() ?: now()
+        val left = days - ((now() - first) / 86_400_000L).toInt()
+        return if (prefs.get("ever_logged") == "1") 0 else left.coerceAtLeast(0)
+    }
+
     private fun publish(a: Account?) { current = a; listener?.invoke(a) }
 
     var token: String?
@@ -147,6 +156,7 @@ class MproCore(
         val body = JSONObject().put("app", appId).put("code", code).put("verifier", prefs.get("verifier") ?: "").put("device", device)
         val j = request("POST", "/api/app/token", body, auth = false)
         token = j.getString("token")
+        prefs.put("ever_logged", "1")
         prefs.put("verifier", null); prefs.put("state", null)
         return apply(j)
     }
