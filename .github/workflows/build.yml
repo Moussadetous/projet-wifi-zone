@@ -130,6 +130,7 @@ jobs:
         if: always()
         run: |
           grep -h "page(s)," logcat.txt | sed 's/.*System.out: //' | sort -u | head -80 || true
+          grep -hE "UiFlowTest|PdfTest.*par feuille|GoBackend|WireGuard/" logcat.txt | grep -v "page(s)," | head -40 || true
           for f in screens/*.png; do
             [ -f "$f" ] || continue
             convert "$f" -resize 36% -quality 68 "${f%.png}.jpg" || cp "$f" "${f%.png}.jpg"

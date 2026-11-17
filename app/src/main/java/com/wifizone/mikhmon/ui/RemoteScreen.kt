@@ -104,7 +104,7 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
     Column(Modifier.fillMaxSize().background(Brand.Bg).verticalScroll(rememberScrollState())) {
         BackHeader("Accès à distance", { nav.overlay = null }, "Back To Home de MikroTik")
         Column(Modifier.padding(horizontal = 16.dp)) {
-            RemoteHero(price, perMonth)
+            RemoteHero(price, perMonth, active = until)
             Spacer(Modifier.height(14.dp))
             val s = support
             when {
@@ -214,7 +214,7 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
 
 /** Bandeau publicitaire de l'accès à distance (accueil, écran dédié). */
 @Composable
-fun RemoteHero(price: Long, perMonth: Long, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+fun RemoteHero(price: Long, perMonth: Long, modifier: Modifier = Modifier, active: LocalDate? = null, onClick: (() -> Unit)? = null) {
     Column(modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Brand.Hero)
         .let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(18.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -223,7 +223,8 @@ fun RemoteHero(price: Long, perMonth: Long, modifier: Modifier = Modifier, onCli
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("NOUVEAU", color = Color.White.copy(alpha = 0.85f), fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontSize = 11.sp)
+                Text(if (active != null) "ACTIF JUSQU'AU ${active.format(DAY)}" else "NOUVEAU", color = Color.White.copy(alpha = 0.85f),
+                    fontWeight = FontWeight.Black, letterSpacing = 2.sp, fontSize = 11.sp)
                 Text("Votre routeur, où que vous soyez", color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp)
             }
         }
