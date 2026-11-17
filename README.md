@@ -33,7 +33,9 @@ Mikhmon v3 tout-en-un sur Android, sans Termux, avec un tableau de contrôle nat
   boutique au prix des articles (1 000 F), sans rien changer au serveur. Activation en un geste depuis le Wi-Fi du
   routeur (utilisateur Back To Home créé par l'application), puis tunnel WireGuard intégré (bibliothèque officielle,
   Apache 2.0) utilisé seulement par l'application et seulement vers le routeur ; bascule automatique Wi-Fi / distance
-  pour les écrans natifs et pour Mikhmon.
+  pour les écrans natifs et pour Mikhmon. **Activation automatique** dès l'achat (sur le Wi-Fi du routeur, ou au premier
+  passage dessus), puis l'autorisation VPN d'Android proposée une fois. Réglage « Actualisation à distance »
+  (Automatique, Rapide, Économe) ; diagnostic étape par étape avec rapport à copier.
 - Raccourcis sur l'icône (appui long) : générer des tickets, clients, trafic, journal.
 
 ## Comment ça marche

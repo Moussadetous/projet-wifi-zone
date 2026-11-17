@@ -63,7 +63,7 @@ fun TrafficScreen() {
             runCatching { repo.traffic(name) }
                 .onSuccess { samples.add(it); if (samples.size > 90) samples.removeAt(0); error = null }
                 .onFailure { error = it.message }
-            delay(1000)
+            delay((1000 * com.wifizone.mikhmon.remote.RemoteAccess.pollFactor()).toLong())
         }
     }
     val active by polling(3000) { repo.active() }

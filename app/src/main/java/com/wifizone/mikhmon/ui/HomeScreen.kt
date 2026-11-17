@@ -60,6 +60,8 @@ fun HomeScreen(activity: Activity, nav: Nav) {
                 }
                 val online = res?.isSuccess == true
                 Pill(if (online) "En ligne" else if (res == null) "…" else "Hors ligne", if (online) Brand.Green else Brand.Red)
+                val remoteUp by RemoteAccess.up.collectAsState()
+                if (remoteUp) { Spacer(Modifier.width(6.dp)); Pill("À distance", Brand.Violet) }
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.size(42.dp).clip(CircleShape).background(Brand.Hero).clickable { nav.open(Overlay.Account) }, contentAlignment = Alignment.Center) {
                     Text(account?.name?.split(" ")?.take(2)?.joinToString("") { it.take(1) }?.uppercase()?.ifBlank { null } ?: "?", color = Color.White, fontWeight = FontWeight.Bold)
@@ -75,6 +77,8 @@ fun HomeScreen(activity: Activity, nav: Nav) {
                 val supported = RemoteAccess.support.value?.supported == true
                 val (title, text, action) = when {
                     RemoteAccess.ready -> Triple("Accès à distance : routeur injoignable", lastRemote ?: err.message.orEmpty(), "Diagnostiquer")
+                    RemoteAccess.paid && !onWifi -> Triple("Accès à distance payé ✓",
+                        "Connectez le téléphone une fois au Wi-Fi du routeur : l'activation se fera toute seule.", null)
                     !onWifi && supported -> Triple("Vous n'êtes pas sur le Wi-Fi du routeur",
                         "Pour le joindre d'ici (4G, autre Wi-Fi), activez l'accès à distance : il se paie puis s'active une fois depuis le Wi-Fi du routeur.", "Accès à distance")
                     !onWifi -> Triple("Vous n'êtes pas sur le Wi-Fi du routeur", "Connectez le téléphone au Wi-Fi de votre MikroTik.", null)

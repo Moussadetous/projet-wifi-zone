@@ -192,11 +192,18 @@ class UiFlowTest {
         RemoteAccess.promoShown = false
         open(null, 7000, "16-acces-distance-pub")
 
-        // Accès payé (article « distance-AAAAMMJJ ») : écran dédié, puis activation sur le routeur.
+        // Accès payé (article « distance-AAAAMMJJ ») : il s'active tout seul sur le routeur, sans bouton,
+        // puis l'application propose l'autorisation VPN d'Android (dernière étape).
         Services.account.seedForTests(account("trial", listOf(RemotePlan.item(LocalDate.now()))))
         assertTrue(RemoteAccess.paid)
-        open("distance", 5000, "17-acces-distance")
-        val c = runBlocking { RemoteAccess.activate() }
+        val auto = Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("open", "distance")
+        ActivityScenario.launch<MainActivity>(auto).use {
+            until(30_000, "activation automatique après l'achat") { RemoteAccess.configured.value }
+            Thread.sleep(2500)
+            shot("17-activation-automatique")
+        }
+        RemoteAccess.askPermission.value = false
+        val c = RemoteAccess.config()!!
         assertEquals("192.168.216.1", c.routerAddress)
         open("distance", 5000, "18-acces-distance-actif")
 

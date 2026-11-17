@@ -151,11 +151,24 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                         until == null -> BuyArea(purchase, acc, RemotePlan.item(start), RemotePlan.label(start), "Payer ${Fmt.money(price, "F")} · 2 mois",
                             icon = Icons.GLOBE, match = { it.startsWith(RemotePlan.PREFIX) })
                         !configured -> {
-                            BigButton("Activer sur le routeur", enabled = onWifi, loading = busy == "activate", icon = Icons.SHIELD) {
-                                withVpn { act("activate", { "Accès à distance activé ✓\nVous pouvez maintenant joindre votre routeur depuis la 4G ou un autre Wi-Fi." }) { RemoteAccess.activate(); "" } }
+                            // L'activation se fait toute seule après l'achat (sur le Wi-Fi du routeur) ; le bouton reste en secours.
+                            val act0 by RemoteAccess.activation.collectAsState()
+                            when {
+                                act0 == "running" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.5.dp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Activation automatique sur votre routeur…", color = Brand.Indigo, fontWeight = FontWeight.SemiBold)
+                                }
+                                !onWifi -> Text("Accès payé ✓ Connectez le téléphone une fois au Wi-Fi du routeur : l'activation se fera toute seule.",
+                                    color = Brand.Indigo, fontWeight = FontWeight.SemiBold)
+                                else -> {
+                                    act0?.let { Text("L'activation automatique n'a pas abouti : $it", color = Brand.Red, style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(bottom = 8.dp)) }
+                                    BigButton(if (act0 != null) "Réessayer l'activation" else "Activer maintenant", loading = busy == "activate", icon = Icons.SHIELD) {
+                                        withVpn { act("activate", { "Accès à distance activé ✓\nVous pouvez maintenant joindre votre routeur depuis la 4G ou un autre Wi-Fi." }) { RemoteAccess.activate(); "" } }
+                                    }
+                                }
                             }
-                            if (!onWifi) Text("Connectez-vous au Wi-Fi du routeur pour l'activer (une seule fois).", color = Brand.Amber,
-                                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                         }
                         else -> BigButton("Tester l'accès à distance", loading = busy == "test", icon = Icons.GLOBE) {
                             withVpn { act("test", { "Routeur « $it » joint à distance ✓" }) { RemoteAccess.test() } }
@@ -185,6 +198,17 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                             "Seule l'application l'utilise, et seulement pour joindre votre routeur : votre téléphone n'est pas ralenti.", style = MaterialTheme.typography.bodySmall)
                         Text("• Tableau de bord, clients, tickets, impression et Mikhmon complet fonctionnent comme sur place.", style = MaterialTheme.typography.bodySmall)
                         Text("• ${Fmt.money(perMonth, "F")} par mois, payé par périodes de 2 mois (${Fmt.money(price, "F")}). Rien n'est renouvelé sans vous.", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (until != null || configured) {
+                        val sp by RemoteAccess.speed.collectAsState()
+                        SectionTitle("Actualisation à distance")
+                        Panel(Modifier.fillMaxWidth()) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                RemoteAccess.Speed.values().forEach { v -> SelectChip(v.label, sp == v) { RemoteAccess.setSpeed(v) } }
+                            }
+                            Text(sp.hint, color = Brand.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                            Text("En Wi-Fi local, l'application reste toujours à pleine vitesse.", color = Brand.Muted, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     SectionTitle("Avancé")
                     Panel(Modifier.fillMaxWidth(), padding = 4.dp) {

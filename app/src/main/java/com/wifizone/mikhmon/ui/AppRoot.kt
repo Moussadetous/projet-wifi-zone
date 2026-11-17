@@ -124,6 +124,14 @@ fun AppRoot(activity: Activity) {
         }
     }
 
+    // Accès à distance acheté : il s'active tout seul dès que le téléphone est sur le Wi-Fi du routeur.
+    val itemsKey = account?.items
+    LaunchedEffect(itemsKey, gateChecked) {
+        if (gateChecked && RemoteAccess.autoActivate()) {
+            Toast.makeText(activity, "Accès à distance activé sur votre routeur ✓", Toast.LENGTH_LONG).show()
+        }
+    }
+
     // Retours de la boutique : connexion (…://auth) et paiement (…://paiement).
     LaunchedEffect(Unit) {
         Services.links.collect { uri ->
@@ -171,6 +179,8 @@ fun AppRoot(activity: Activity) {
         val obs = LifecycleEventObserver { _, e ->
             if (e == Lifecycle.Event.ON_RESUME && Services.account.loggedIn) scope.launch {
                 runCatching { if (Services.account.account.value?.pending != null) Services.account.checkoutStatus() else Services.account.refresh() }
+                // Retour sur le Wi-Fi du routeur avec un accès payé mais pas encore créé : on le crée.
+                if (RemoteAccess.autoActivate()) Toast.makeText(activity, "Accès à distance activé sur votre routeur ✓", Toast.LENGTH_LONG).show()
             }
         }
         owner.lifecycle.addObserver(obs)
@@ -190,6 +200,31 @@ fun AppRoot(activity: Activity) {
     if (locked && nav.overlay !is Overlay.Setup) {
         Gate(activity, acc, onRouterSettings = { nav.open(Overlay.Setup) }, onSkip = { skipGate = true })
         return
+    }
+
+    // Dernière étape de l'accès à distance : l'autorisation « VPN » qu'Android demande une seule fois.
+    val askVpn by RemoteAccess.askPermission.collectAsState()
+    val vpnLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { r ->
+        RemoteAccess.askPermission.value = false
+        if (r.resultCode == Activity.RESULT_OK) {
+            Services.router.reset()
+            Toast.makeText(activity, "Accès à distance prêt ✓", Toast.LENGTH_SHORT).show()
+        }
+    }
+    if (askVpn) {
+        val intent = RemoteAccess.permissionIntent()
+        if (intent == null) LaunchedEffect(Unit) { RemoteAccess.askPermission.value = false }
+        else androidx.compose.material3.AlertDialog(
+            onDismissRequest = { RemoteAccess.askPermission.value = false },
+            title = { Text("Dernière étape") },
+            text = {
+                Text("Pour joindre votre routeur depuis la 4G ou un autre Wi-Fi, Android demande d'autoriser une fois la " +
+                    "connexion sécurisée de l'application. Seule l'application l'utilise, et seulement pour votre routeur.")
+            },
+            confirmButton = { androidx.compose.material3.TextButton({ vpnLauncher.launch(intent) }) { Text("Autoriser") } },
+            dismissButton = { androidx.compose.material3.TextButton({ RemoteAccess.askPermission.value = false }) { Text("Plus tard") } },
+        )
     }
 
     when (val o = nav.overlay) {

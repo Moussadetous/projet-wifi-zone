@@ -90,6 +90,50 @@ object RemoteAccess {
         get() = prefs.getBoolean("promoShown", false)
         set(v) { prefs.edit().putBoolean("promoShown", v).apply() }
 
+    // ------------------------------------------------------------------ vitesse d'actualisation à distance
+    /** Rythme des relectures des écrans quand on passe par le tunnel (en Wi-Fi local, rien ne change). */
+    enum class Speed(val label: String, val factor: Float, val hint: String) {
+        AUTO("Automatique", 2.5f, "Recommandé : un peu moins souvent qu'en Wi-Fi, pour rester fluide à travers le relais."),
+        FAST("Rapide", 1f, "Aussi souvent qu'en Wi-Fi : plus réactif, mais peut ralentir si le relais est chargé."),
+        ECO("Économe", 5f, "Le moins de données possible : idéal en 4G avec un petit forfait."),
+    }
+
+    val speed by lazy { MutableStateFlow(runCatching { Speed.valueOf(prefs.getString("speed", "AUTO")!!) }.getOrDefault(Speed.AUTO)) }
+
+    fun setSpeed(v: Speed) { prefs.edit().putString("speed", v.name).apply(); speed.value = v }
+
+    /** Facteur appliqué aux relectures des écrans : 1 en Wi-Fi local, selon le réglage à distance. */
+    fun pollFactor(): Float = if (up.value) speed.value.factor else 1f
+
+    // ------------------------------------------------------------------ activation automatique après l'achat
+    /** Activation automatique : null (rien en cours), "running", ou le message d'erreur de la dernière tentative. */
+    val activation = MutableStateFlow<String?>(null)
+    /** L'autorisation « VPN » d'Android est à demander (après l'activation, ou quand le tunnel en a besoin). */
+    val askPermission = MutableStateFlow(false)
+    private val activating = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Accès payé mais pas encore créé sur le routeur : l'application le crée toute seule dès que le téléphone est sur
+     * le Wi-Fi du routeur, sans bouton à chercher. Renvoie true si l'activation vient d'être faite.
+     */
+    suspend fun autoActivate(): Boolean {
+        if (!paid || config() != null) return false
+        val s = Services.settings.load() ?: return false
+        if (!onRouterWifi(s)) return false
+        if (!activating.compareAndSet(false, true)) return false
+        try {
+            if (support.value?.supported != true) refreshSupport()
+            if (support.value?.supported != true) return false
+            activation.value = "running"
+            val ok = runCatching { activate() }
+            activation.value = ok.exceptionOrNull()?.let { it.message ?: "Activation impossible pour le moment." }
+            if (ok.isSuccess && permissionIntent() != null) askPermission.value = true
+            return ok.isSuccess
+        } finally {
+            activating.set(false)
+        }
+    }
+
     /** Autorisation « VPN » d'Android (demandée une seule fois) : null si déjà accordée. */
     fun permissionIntent(): Intent? = VpnService.prepare(ctx)
 
@@ -133,7 +177,10 @@ object RemoteAccess {
     fun ensureUp(s: MikhmonSettings) {
         val c = config() ?: throw IllegalStateException("L'accès à distance n'est pas activé sur ce téléphone.")
         if (!paid) throw IllegalStateException("Votre accès à distance a expiré : renouvelez-le (Compte › Accès à distance).")
-        if (permissionIntent() != null) throw IllegalStateException("Autorisez la connexion sécurisée (VPN) de l'application : Compte › Accès à distance.")
+        if (permissionIntent() != null) {
+            askPermission.value = true
+            throw IllegalStateException("Autorisez la connexion sécurisée (VPN) de l'application : touchez « Autoriser » dans la fenêtre qui s'affiche.")
+        }
         if (started && runCatching { backend.getState(tunnel) }.getOrNull() == Tunnel.State.UP) return
         backend.setState(tunnel, Tunnel.State.UP, build(c, s))
         started = true

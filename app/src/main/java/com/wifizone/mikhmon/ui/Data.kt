@@ -12,6 +12,7 @@ fun <T> polling(intervalMs: Long, vararg keys: Any?, load: suspend () -> T): Sta
         while (true) {
             val r = runCatching { load() }
             value = if (r.isFailure && value?.isSuccess == true) value else r
-            delay(intervalMs)
+            // À distance (par le tunnel), relectures espacées selon le réglage « Actualisation à distance ».
+            delay((intervalMs * com.wifizone.mikhmon.remote.RemoteAccess.pollFactor()).toLong())
         }
     }
