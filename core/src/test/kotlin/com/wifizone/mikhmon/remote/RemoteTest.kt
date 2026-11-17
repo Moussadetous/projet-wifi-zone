@@ -79,6 +79,29 @@ class RemoteTest {
         }
     }
 
+    /** Le pare-feu par défaut de MikroTik bloque l'API depuis Back To Home : l'application l'ouvre, une seule fois. */
+    @Test fun opensApiThroughDefaultFirewall() {
+        val f = FakeRouterOs(version = "7.18 (stable)").start()
+        f.use {
+            RouterOs.connect("127.0.0.1", "admin", "secret", port = f.port).use { r ->
+                val c = BackToHome.setup(r, "mikhmon-android-ab12") { }
+                assertEquals("192.168.216.0/24", BackToHome.subnet(c))
+                assertEquals("HEX0A1B2C3D", BackToHome.serial(r))
+                f.apiAddress = "192.168.88.0/24"
+                val done = BackToHome.openApi(r, BackToHome.subnet(c)!!, 8728)
+                assertEquals(done.toString(), 2, done.size)
+                // La règle passe avant « drop all not coming from LAN » (et après la règle dynamique).
+                val order = f.filter.map { it["comment"] }
+                assertEquals(BackToHome.RULE_COMMENT, order[1])
+                assertTrue(order.indexOf(BackToHome.RULE_COMMENT) < order.indexOf("defconf: drop all not coming from LAN"))
+                assertEquals("192.168.88.0/24,192.168.216.0/24", f.apiAddress)
+                // Deuxième passage : rien à refaire.
+                assertTrue(BackToHome.openApi(r, "192.168.216.0/24", 8728).isEmpty())
+                assertEquals(1, f.filter.count { it["comment"] == BackToHome.RULE_COMMENT })
+            }
+        }
+    }
+
     @Test fun setupCreatesOneAccessPerDevice() {
         FakeRouterOs(version = "7.18 (stable)").start().use { f ->
             RouterOs.connect("127.0.0.1", "admin", "secret", port = f.port).use { r ->

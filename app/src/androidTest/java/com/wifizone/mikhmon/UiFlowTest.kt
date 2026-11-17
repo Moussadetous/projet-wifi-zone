@@ -213,6 +213,11 @@ class UiFlowTest {
                 RemoteAccess.down()
                 assertFalse(RemoteAccess.up.value)
                 Log.i("UiFlowTest", "Tunnel WireGuard : ouverture et fermeture réussies")
+                // Diagnostic complet (pas de vrai routeur au bout : le relais ne répond pas, et il doit le dire).
+                val steps = runBlocking { RemoteAccess.diagnose() }
+                Log.i("UiFlowTest", "Diagnostic :\n" + RemoteAccess.report(steps))
+                assertTrue(steps.any { it.title == "Tunnel WireGuard" && it.ok == true })
+                assertTrue(steps.any { it.title == "Réponse du routeur par le relais" && it.ok == false })
             } else Log.w("UiFlowTest", "Autorisation VPN non accordée par appops : test du tunnel ignoré")
         }
         runBlocking { RemoteAccess.deactivate() }

@@ -66,6 +66,29 @@ fun HomeScreen(activity: Activity, nav: Nav) {
                 }
             }
         }
+        // Routeur injoignable : pourquoi et quoi faire (hors du Wi-Fi du routeur notamment).
+        res?.exceptionOrNull()?.let { err ->
+            item {
+                val lastRemote by RemoteAccess.lastError.collectAsState()
+                val cfg = remember { Services.settings.load() }
+                val onWifi = cfg?.let { RemoteAccess.onRouterWifi(it) } ?: false
+                val supported = RemoteAccess.support.value?.supported == true
+                val (title, text, action) = when {
+                    RemoteAccess.ready -> Triple("Accès à distance : routeur injoignable", lastRemote ?: err.message.orEmpty(), "Diagnostiquer")
+                    !onWifi && supported -> Triple("Vous n'êtes pas sur le Wi-Fi du routeur",
+                        "Pour le joindre d'ici (4G, autre Wi-Fi), activez l'accès à distance : il se paie puis s'active une fois depuis le Wi-Fi du routeur.", "Accès à distance")
+                    !onWifi -> Triple("Vous n'êtes pas sur le Wi-Fi du routeur", "Connectez le téléphone au Wi-Fi de votre MikroTik.", null)
+                    else -> Triple("Routeur injoignable", err.message.orEmpty(), null)
+                }
+                Column(Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(Brand.Red.copy(alpha = 0.08f)).padding(14.dp)) {
+                    Text(title, fontWeight = FontWeight.Bold, color = Brand.Red)
+                    Spacer(Modifier.height(4.dp))
+                    Text(text, style = MaterialTheme.typography.bodySmall)
+                    if (action != null) Text(action, color = Brand.Indigo, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(10.dp)).clickable { nav.open(Overlay.Remote) }.padding(6.dp))
+                }
+            }
+        }
         // Accès à distance : mis en avant si le routeur le permet et qu'il n'est pas encore pris ; sinon son état.
         item {
             val support by RemoteAccess.support.collectAsState()

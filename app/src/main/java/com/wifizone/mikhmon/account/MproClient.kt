@@ -39,7 +39,7 @@ class MproClient(
             val net = cm.allNetworks.firstOrNull { n ->
                 val c = cm.getNetworkCapabilities(n) ?: return@firstOrNull false
                 c.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) && c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                    && !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                    && !c.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && !c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
             } ?: return null
             return net.openConnection(url) as HttpURLConnection
         }

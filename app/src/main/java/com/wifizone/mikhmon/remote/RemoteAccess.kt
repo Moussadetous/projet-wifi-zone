@@ -9,11 +9,13 @@ import com.wifizone.mikhmon.RouterOs
 import com.wifizone.mikhmon.RouterOsException
 import com.wifizone.mikhmon.Services
 import com.wifizone.mikhmon.WifiNetwork
+import com.wireguard.android.backend.BackendException
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import com.wireguard.config.Interface
 import com.wireguard.config.Peer
+import com.wireguard.crypto.Key
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
@@ -148,32 +150,91 @@ object RemoteAccess {
     }
 
     // ------------------------------------------------------------------ connexions au routeur
+    /** Dernière erreur de l'accès à distance (affichée sur l'accueil), null quand tout va bien. */
+    val lastError = MutableStateFlow<String?>(null)
+
+    /** Numéro de série du routeur : reconnaît SON Wi-Fi (beaucoup de MikroTik répondent sur 192.168.88.1). */
+    private var routerSerial: String
+        get() = prefs.getString("serial", "").orEmpty()
+        set(v) { prefs.edit().putString("serial", v).apply() }
+
     private fun remoteHosts(s: MikhmonSettings): List<String> =
         listOfNotNull(remoteHost, config()?.routerAddress, s.routerIp).distinct()
 
-    /** Connexion à l'API du routeur : en Wi-Fi local, sinon (accès payé et activé) par le tunnel. */
+    /** Heure du dernier échange WireGuard réussi avec le routeur (0 : jamais). */
+    private fun handshakeAt(c: WgConf): Long = runCatching {
+        backend.getStatistics(tunnel).peer(Key.fromBase64(c.peerPublicKey))?.latestHandshakeEpochMillis() ?: 0L
+    }.getOrDefault(0L)
+
+    /** Attend un échange avec le routeur par le relais Back To Home (preuve que le tunnel fonctionne vraiment). */
+    private fun waitHandshake(c: WgConf, timeoutMs: Long): Boolean {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            if (handshakeAt(c) > System.currentTimeMillis() - 180_000L) return true
+            Thread.sleep(300)
+        }
+        return false
+    }
+
+    /** Message clair pour une erreur d'ouverture du tunnel. */
+    fun explain(e: Throwable): String = when ((e as? BackendException)?.reason) {
+        BackendException.Reason.VPN_NOT_AUTHORIZED -> "Autorisez la connexion sécurisée (VPN) : Compte › Accès à distance › Tester."
+        BackendException.Reason.DNS_RESOLUTION_FAILURE -> "Adresse du relais Back To Home introuvable : le téléphone a-t-il Internet ?"
+        BackendException.Reason.UNABLE_TO_START_VPN, BackendException.Reason.TUN_CREATION_ERROR ->
+            "Android a refusé d'ouvrir le tunnel : une autre application VPN est peut-être active (désactivez-la)."
+        else -> e.message ?: "Tunnel impossible à ouvrir."
+    }
+
+    /** Le routeur joint est-il bien le nôtre (et pas un autre MikroTik à la même adresse) ? */
+    private fun sameRouter(r: RouterOs): Boolean {
+        val known = routerSerial
+        if (known.isEmpty()) return true
+        val now = runCatching { BackToHome.serial(r) }.getOrDefault("")
+        return now.isEmpty() || now == known
+    }
+
+    /**
+     * Connexion à l'API du routeur : directe sur son Wi-Fi ; sinon (accès payé et activé) par le tunnel. Si la
+     * connexion directe échoue pour une raison quelconque (autre Wi-Fi, autre MikroTik à la même adresse…), le tunnel
+     * prend le relais.
+     */
     fun connect(s: MikhmonSettings, timeoutMs: Int = 8000, forceRemote: Boolean = false): RouterOs {
         if (!forceRemote && !remoteMode(s)) {
             down()
-            try {
-                return RouterOs.connect(s.routerIp, s.routerUser, s.routerPass, s.routerPort, timeoutMs) { WifiNetwork.socketFor(ctx, s.routerIp) }
-            } catch (e: RouterOsException) {
-                // Wi-Fi d'un autre lieu avec les mêmes adresses : on tente la connexion à distance.
-                if (!ready || e.kind != RouterOsException.Kind.UNREACHABLE) throw e
-            }
+            val local = try {
+                val r = RouterOs.connect(s.routerIp, s.routerUser, s.routerPass, s.routerPort, timeoutMs) { WifiNetwork.socketFor(ctx, s.routerIp) }
+                if (sameRouter(r)) { lastError.value = null; return r }
+                r.close()
+                RouterOsException(RouterOsException.Kind.UNREACHABLE, "Ce Wi-Fi n'est pas celui de votre routeur : un autre MikroTik répond à l'adresse ${s.routerIp}.")
+            } catch (e: RouterOsException) { e }
+            if (!ready) throw local
         }
-        ensureUp(s)
+        return try {
+            remote(s).also { lastError.value = null }
+        } catch (e: RouterOsException) {
+            lastError.value = e.message
+            throw e
+        }
+    }
+
+    private fun remote(s: MikhmonSettings): RouterOs {
+        val c = config() ?: throw RouterOsException(RouterOsException.Kind.UNREACHABLE, "L'accès à distance n'est pas activé sur ce téléphone.")
+        try { ensureUp(s) } catch (e: Exception) { throw RouterOsException(RouterOsException.Kind.UNREACHABLE, explain(e)) }
+        if (!waitHandshake(c, 9000)) throw RouterOsException(RouterOsException.Kind.UNREACHABLE,
+            "Le routeur ne répond pas par le relais Back To Home. Vérifiez qu'il est allumé et qu'il a Internet " +
+                "(Winbox : IP › Cloud › « BTH VPN is ready »). Certains Wi-Fi publics bloquent aussi ces connexions : essayez en 4G.")
         var last: Exception? = null
         for (h in remoteHosts(s)) {
             try {
-                return RouterOs.connect(h, s.routerUser, s.routerPass, s.routerPort, 15000) { Socket() }.also { remoteHost = h }
+                return RouterOs.connect(h, s.routerUser, s.routerPass, s.routerPort, 12000) { Socket() }.also { remoteHost = h }
             } catch (e: RouterOsException) {
                 if (e.kind == RouterOsException.Kind.BAD_LOGIN) throw e
                 last = e
             }
         }
         throw RouterOsException(RouterOsException.Kind.UNREACHABLE,
-            "Routeur injoignable à distance : vérifiez qu'il est allumé et connecté à Internet. (${last?.message ?: "aucune réponse"})")
+            "Le tunnel fonctionne, mais le routeur refuse l'accès à son API (port ${s.routerPort}) : son pare-feu le bloque. " +
+                "Ouvrez l'application une fois sur le Wi-Fi du routeur : elle le règle toute seule. (${last?.message ?: "aucune réponse"})")
     }
 
     /** Cible du pont de Mikhmon (PHP), à chaque nouvelle connexion. */
@@ -190,12 +251,96 @@ object RemoteAccess {
     suspend fun refreshSupport(): BackToHome.Support? = runCatching { Services.router.call { BackToHome.check(it) } }
         .onSuccess { saveSupport(it) }.getOrNull()
 
-    /** Active « Back To Home » sur le routeur et enregistre l'accès de ce téléphone. */
+    /** Active « Back To Home » sur le routeur, ouvre son API au tunnel et enregistre l'accès de ce téléphone. */
     suspend fun activate(): WgConf {
-        val c = Services.router.call { r -> BackToHome.setup(r, deviceName) }
+        val s = Services.settings.load() ?: throw IllegalStateException("Routeur non configuré")
+        val c = Services.router.call { r ->
+            val conf = BackToHome.setup(r, deviceName)
+            routerSerial = BackToHome.serial(r)
+            BackToHome.subnet(conf)?.let { BackToHome.openApi(r, it, s.routerPort) }
+            conf
+        }
         saveConfig(c)
         refreshSupport()
         return c
+    }
+
+    /**
+     * Sur le Wi-Fi du routeur, une fois l'accès créé : règle le routeur pour l'accès à distance (pare-feu, service API)
+     * et retient son numéro de série. Sans effet si tout est déjà en place. Renvoie les changements faits.
+     */
+    suspend fun prepareRouter(): List<String> {
+        val c = config() ?: return emptyList()
+        val s = Services.settings.load() ?: return emptyList()
+        if (!onRouterWifi(s)) return emptyList()
+        return runCatching {
+            Services.router.call { r ->
+                if (routerSerial.isEmpty()) routerSerial = BackToHome.serial(r)
+                BackToHome.subnet(c)?.let { BackToHome.openApi(r, it, s.routerPort) }.orEmpty()
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    /** Routeur reconfiguré (autre adresse, autre routeur) : son numéro de série sera relu sur place. */
+    fun forgetRouter() { prefs.edit().remove("serial").apply(); remoteHost = null }
+
+    /** Une étape du diagnostic : réussie (true), en échec (false) ou sans objet (null). */
+    data class Step(val title: String, val ok: Boolean?, val detail: String)
+
+    private fun describeNetwork(s: MikhmonSettings): String {
+        val w = WifiNetwork.detect(ctx)
+        return when {
+            !w.connected -> "données mobiles (pas de Wi-Fi)"
+            onRouterWifi(s) -> "Wi-Fi du routeur (passerelle ${w.gateway ?: "?"})"
+            else -> "autre Wi-Fi (passerelle ${w.gateway ?: "?"}, adresse ${w.ownIp ?: "?"})"
+        }
+    }
+
+    /**
+     * Diagnostic de l'accès à distance, étape par étape. Passe toujours par le tunnel, même sur le Wi-Fi du routeur :
+     * il montre précisément ce qui bloque (abonnement, activation, autorisation VPN, relais, pare-feu du routeur).
+     */
+    suspend fun diagnose(): List<Step> = withContext(Dispatchers.IO) {
+        val out = ArrayList<Step>()
+        val s = Services.settings.load() ?: return@withContext listOf(Step("Routeur", false, "routeur non configuré"))
+        val sup = support.value
+        out += Step("Routeur compatible", sup?.supported, sup?.let { "RouterOS ${it.version}" + if (it.status.isNotBlank()) " · ${it.status}" else "" } ?: "pas encore vérifié")
+        val until = activeUntil()
+        out += Step("Abonnement", until != null, until?.let { "actif jusqu'au $it" } ?: "inactif : payez l'accès à distance")
+        val c = config()
+        out += Step("Accès créé sur le routeur", c != null, c?.let { "$deviceName · relais ${it.endpoint}" } ?: "touchez « Activer sur le routeur » depuis son Wi-Fi")
+        out += Step("Réseau du téléphone", null, describeNetwork(s))
+        if (until == null || c == null) return@withContext out
+        val allowed = permissionIntent() == null
+        out += Step("Autorisation VPN d'Android", allowed, if (allowed) "accordée" else "à accorder : touchez « Tester l'accès à distance »")
+        if (!allowed) return@withContext out
+        val host = c.endpoint.substringBeforeLast(':').trim('[', ']')
+        val ips = runCatching { java.net.InetAddress.getAllByName(host).mapNotNull { it.hostAddress } }
+        out += Step("Adresse du relais", ips.isSuccess, ips.getOrNull()?.joinToString() ?: "introuvable : ${ips.exceptionOrNull()?.message}")
+        val opened = runCatching { ensureUp(s) }
+        out += Step("Tunnel WireGuard", opened.isSuccess, if (opened.isSuccess) "ouvert" else explain(opened.exceptionOrNull()!!))
+        if (opened.isFailure) return@withContext out
+        val hs = waitHandshake(c, 10_000)
+        out += Step("Réponse du routeur par le relais", hs,
+            if (hs) "échange WireGuard réussi" else "aucune réponse en 10 s : routeur éteint, sans Internet, ou Back To Home pas prêt")
+        if (hs) for (h in listOfNotNull(c.routerAddress, s.routerIp).distinct()) {
+            val t0 = System.currentTimeMillis()
+            val r = runCatching {
+                RouterOs.connect(h, s.routerUser, s.routerPass, s.routerPort, 10_000) { Socket() }
+                    .use { it.command("/system/identity/print").firstOrNull()?.get("name").orEmpty() }
+            }
+            out += Step("API du routeur ($h:${s.routerPort})", r.isSuccess,
+                r.getOrNull()?.let { "routeur « $it » joint en ${System.currentTimeMillis() - t0} ms" }
+                    ?: "${r.exceptionOrNull()?.message} — pare-feu du routeur ? (ouvrez l'application sur son Wi-Fi pour le régler)")
+            if (r.isSuccess) { remoteHost = h; lastError.value = null; break }
+        }
+        if (!remoteMode(s)) down()
+        out
+    }
+
+    /** Rapport du diagnostic, à copier pour le support. */
+    fun report(steps: List<Step>): String = steps.joinToString("\n") { st ->
+        (when (st.ok) { true -> "✓"; false -> "✗"; null -> "•" }) + " " + st.title + " : " + st.detail
     }
 
     /** Teste la connexion à distance (même sur le Wi-Fi du routeur) : renvoie le nom du routeur. */

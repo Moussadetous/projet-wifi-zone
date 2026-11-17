@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -79,7 +80,14 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
     val start = RemotePlan.nextStart(acc?.items.orEmpty(), LocalDate.now())
     val onWifi = settings?.let { RemoteAccess.onRouterWifi(it) } ?: false
 
-    LaunchedEffect(Unit) { RemoteAccess.refreshSupport(); checking = false }
+    var steps by remember { mutableStateOf<List<RemoteAccess.Step>?>(null) }
+    var diagnosing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        RemoteAccess.refreshSupport(); checking = false
+        // Sur le Wi-Fi du routeur : pare-feu et service API réglés pour l'accès à distance (sans effet si déjà fait).
+        val changes = RemoteAccess.prepareRouter()
+        if (changes.isNotEmpty()) message = "Routeur préparé pour l'accès à distance :\n• " + changes.joinToString("\n• ")
+    }
 
     // Autorisation « VPN » d'Android, demandée une seule fois.
     val vpn = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -153,6 +161,17 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                             withVpn { act("test", { "Routeur « $it » joint à distance ✓" }) { RemoteAccess.test() } }
                         }
                     }
+                    if (until != null && configured) {
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton({
+                            withVpn {
+                                diagnosing = true
+                                scope.launch { steps = RemoteAccess.diagnose(); diagnosing = false }
+                            }
+                        }, Modifier.fillMaxWidth(), enabled = !diagnosing) {
+                            Text(if (diagnosing) "Diagnostic en cours…" else "Diagnostiquer l'accès à distance")
+                        }
+                    }
                     if (until != null) {
                         Spacer(Modifier.height(10.dp))
                         BuyArea(purchase, acc, RemotePlan.item(start), RemotePlan.label(start),
@@ -199,6 +218,35 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                 }) { Text("Importer") }
             },
             dismissButton = { TextButton({ importing = false }) { Text("Annuler") } },
+        )
+    }
+    steps?.let { list ->
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        AlertDialog(
+            onDismissRequest = { steps = null },
+            title = { Text("Diagnostic") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    list.forEach { st ->
+                        Row(Modifier.padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
+                            Text(when (st.ok) { true -> "✓"; false -> "✗"; null -> "•" }, fontWeight = FontWeight.Black,
+                                color = when (st.ok) { true -> Brand.Green; false -> Brand.Red; null -> Brand.Muted }, modifier = Modifier.width(22.dp))
+                            Column {
+                                Text(st.title, fontWeight = FontWeight.SemiBold)
+                                Text(st.detail, color = Brand.Muted, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Diagnostic accès à distance", RemoteAccess.report(list)))
+                    android.widget.Toast.makeText(ctx, "Rapport copié : collez-le dans votre message au support", android.widget.Toast.LENGTH_LONG).show()
+                }) { Text("Copier le rapport") }
+            },
+            dismissButton = { TextButton({ steps = null }) { Text("Fermer") } },
         )
     }
     message?.let { m -> AlertDialog(onDismissRequest = { message = null }, title = { Text("Accès à distance") }, text = { Text(m) },

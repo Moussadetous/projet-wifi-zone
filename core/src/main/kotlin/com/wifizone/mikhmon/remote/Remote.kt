@@ -139,6 +139,51 @@ object BackToHome {
         return Support(true, ver, "", bth == "enabled", cloud["vpn-status"].orEmpty())
     }
 
+    /** Menu des utilisateurs Back To Home (RouterOS 7.14+), selon la version : pluriel ou singulier ; null s'il n'existe pas. */
+    fun usersMenu(r: RouterOs): String? = listOf("/ip/cloud/back-to-home-users", "/ip/cloud/back-to-home-user")
+        .firstOrNull { m -> runCatching { r.command("$m/print") }.isSuccess }
+
+    /** Sous-réseau des clients Back To Home (ex. 192.168.216.0/24), d'après la configuration. */
+    fun subnet(c: WgConf): String? = c.routerAddress?.let { it.substringBeforeLast('.') + ".0/24" }
+
+    /** Numéro de série du routeur : il permet de reconnaître SON Wi-Fi (beaucoup de MikroTik ont 192.168.88.1). */
+    fun serial(r: RouterOs): String =
+        runCatching { r.command("/system/routerboard/print").firstOrNull()?.get("serial-number") }.getOrNull()?.ifBlank { null }
+            ?: runCatching { r.command("/system/license/print").firstOrNull()?.get("software-id") }.getOrNull()?.ifBlank { null }
+            ?: runCatching { r.command("/system/identity/print").firstOrNull()?.get("name") }.getOrNull().orEmpty()
+
+    const val RULE_COMMENT = "Mikhmon Android : acces a distance"
+
+    /**
+     * Laisse les clients Back To Home joindre l'API du routeur. Le pare-feu par défaut de MikroTik rejette tout ce qui
+     * ne vient pas du réseau local (« drop all not coming from LAN »), et le service API peut être limité à certaines
+     * adresses : le tunnel s'ouvrirait, mais le routeur ne répondrait pas. Sans effet si c'est déjà en place.
+     * Renvoie les changements faits.
+     */
+    fun openApi(r: RouterOs, subnet: String, apiPort: Int): List<String> {
+        val done = ArrayList<String>()
+        val rules = runCatching { r.command("/ip/firewall/filter/print") }.getOrDefault(emptyList())
+        val mine = rules.firstOrNull { it["comment"] == RULE_COMMENT }
+        if (mine == null) {
+            val args = mutableListOf("/ip/firewall/filter/add", "=chain=input", "=action=accept", "=protocol=tcp", "=dst-port=$apiPort",
+                "=src-address=$subnet", "=comment=$RULE_COMMENT")
+            // En tête des règles (avant « drop all not coming from LAN »).
+            rules.firstOrNull { it["dynamic"] != "true" }?.get(".id")?.let { args += "=place-before=$it" }
+            r.command(*args.toTypedArray())
+            done += "pare-feu : API ouverte au réseau Back To Home ($subnet)"
+        } else if (mine["disabled"] == "true") {
+            r.command("/ip/firewall/filter/enable", "=.id=${mine[".id"]}")
+            done += "pare-feu : règle de l'accès à distance réactivée"
+        }
+        val api = runCatching { r.command("/ip/service/print") }.getOrDefault(emptyList()).firstOrNull { it["name"] == "api" }
+        val allowed = api?.get("address").orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        if (api != null && allowed.isNotEmpty() && subnet !in allowed) {
+            r.command("/ip/service/set", "=.id=${api[".id"]}", "=address=${(allowed + subnet).joinToString(",")}")
+            done += "service API : réseau Back To Home autorisé ($subnet)"
+        }
+        return done
+    }
+
     /** Cherche une configuration WireGuard dans les réponses du routeur, quel que soit le nom du champ. */
     fun findConfig(replies: List<Map<String, String>>): WgConf? =
         replies.asSequence().flatMap { it.values.asSequence() }
@@ -156,25 +201,29 @@ object BackToHome {
             try { r.command("/ip/cloud/set", "=back-to-home-vpn=enabled") }
             catch (e: RouterOsException) { r.command("/ip/cloud/set", "=ddns-enabled=yes", "=back-to-home-vpn=enabled") }
         }
-        val users = runCatching { r.command("/ip/cloud/back-to-home-users/print") }.getOrNull()
-        if (users != null) {
+        val menu = usersMenu(r)
+        if (menu != null) {
+            val users = r.command("$menu/print")
             var id = users.firstOrNull { it["name"] == name }?.get(".id")
             if (id == null) {
                 val added = try {
-                    r.command("/ip/cloud/back-to-home-users/add", "=name=$name", "=allow-lan=yes", "=comment=Mikhmon Android")
+                    r.command("$menu/add", "=name=$name", "=allow-lan=yes", "=comment=Mikhmon Android")
                 } catch (e: RouterOsException) {
-                    r.command("/ip/cloud/back-to-home-users/add", "=name=$name")
+                    r.command("$menu/add", "=name=$name")
                 }
                 id = added.firstOrNull()?.get("ret")
-                    ?: r.command("/ip/cloud/back-to-home-users/print").firstOrNull { it["name"] == name }?.get(".id")
+                    ?: r.command("$menu/print").firstOrNull { it["name"] == name }?.get(".id")
+            } else {
+                // Accès déjà créé : on s'assure qu'il peut joindre le routeur et son réseau.
+                runCatching { r.command("$menu/set", "=.id=$id", "=allow-lan=yes", "=disabled=no") }
             }
             if (id != null) {
                 for (attempt in 0 until 8) {
                     for (args in listOf(arrayOf("=numbers=$id"), arrayOf("=.id=$id"))) {
-                        val shown = runCatching { r.command("/ip/cloud/back-to-home-users/show-client-config", *args) }.getOrDefault(emptyList())
+                        val shown = runCatching { r.command("$menu/show-client-config", *args) }.getOrDefault(emptyList())
                         findConfig(shown)?.let { return it }
                     }
-                    findConfig(runCatching { r.command("/ip/cloud/back-to-home-users/print", "=detail=") }.getOrDefault(emptyList()).filter { it[".id"] == id || it["name"] == name })
+                    findConfig(runCatching { r.command("$menu/print", "=detail=") }.getOrDefault(emptyList()).filter { it[".id"] == id || it["name"] == name })
                         ?.let { return it }
                     wait(1500)
                 }
@@ -189,8 +238,9 @@ object BackToHome {
 
     /** Retire l'accès de cet appareil (désactivation de l'accès à distance). */
     fun remove(r: RouterOs, name: String) {
-        val id = runCatching { r.command("/ip/cloud/back-to-home-users/print") }.getOrDefault(emptyList()).firstOrNull { it["name"] == name }?.get(".id") ?: return
-        runCatching { r.command("/ip/cloud/back-to-home-users/remove", "=.id=$id") }
+        val menu = usersMenu(r) ?: return
+        val id = runCatching { r.command("$menu/print") }.getOrDefault(emptyList()).firstOrNull { it["name"] == name }?.get(".id") ?: return
+        runCatching { r.command("$menu/remove", "=.id=$id") }
     }
 
     /** État du relais Back To Home, lisible (« prêt », « en attente »…). */

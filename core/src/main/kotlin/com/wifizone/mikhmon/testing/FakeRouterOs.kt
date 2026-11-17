@@ -22,6 +22,15 @@ class FakeRouterOs(
 ) : Closeable {
     private var bthState = "disabled"
     private val bthUsers = mutableListOf<Map<String, String>>()
+    /** Pare-feu par défaut de MikroTik (defconf) : une règle dynamique puis les règles statiques. */
+    val filter = mutableListOf(
+        mutableMapOf(".id" to "*D1", "chain" to "forward", "action" to "passthrough", "dynamic" to "true", "comment" to "special dummy rule"),
+        mutableMapOf(".id" to "*1", "chain" to "input", "action" to "accept", "connection-state" to "established,related,untracked", "dynamic" to "false", "comment" to "defconf: accept established,related,untracked"),
+        mutableMapOf(".id" to "*2", "chain" to "input", "action" to "drop", "connection-state" to "invalid", "dynamic" to "false", "comment" to "defconf: drop invalid"),
+        mutableMapOf(".id" to "*3", "chain" to "input", "action" to "drop", "in-interface-list" to "!LAN", "dynamic" to "false", "comment" to "defconf: drop all not coming from LAN"),
+    )
+    /** Adresses autorisées pour le service API (vide : toutes). */
+    var apiAddress = ""
 
     private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
     val port: Int get() = server.localPort
@@ -127,6 +136,21 @@ class FakeRouterOs(
                 re(".id" to "*S2", "name" to "nov/17/2026-|-09:30:02-|-K7M4Q2-|-500-|-10.5.50.23-|-3C:2E:FF:41:8A:10-|-1d-|-1jour-|-vc-482-11.17.26-", "owner" to "nov2026", "comment" to "mikhmon"),
                 re(".id" to "*S3", "name" to "nov/16/2026-|-18:02:13-|-wz-48213-|-2500-|-10.5.50.31-|-A4:50:46:12:CC:07-|-7d-|-semaine-|-up-915-11.16.26-", "owner" to "nov2026", "comment" to "mikhmon"),
             )
+            "/system/routerboard/print" -> listOf(re("routerboard" to "true", "model" to "RB952Ui-5ac2nD", "serial-number" to "HEX0A1B2C3D"))
+            "/ip/firewall/filter/print" -> filter.map { f -> re(*f.entries.map { it.key to it.value }.toTypedArray()) }
+            "/ip/firewall/filter/add" -> {
+                val id = "*" + (filter.size + 10)
+                val rule = mutableMapOf(".id" to id, "dynamic" to "false") + args.filterKeys { it != "place-before" }
+                val before = args["place-before"]?.let { b -> filter.indexOfFirst { it[".id"] == b } } ?: -1
+                if (before >= 0) filter.add(before, rule.toMutableMap()) else filter.add(rule.toMutableMap())
+                listOf(listOf("!done", "=ret=$id"))
+            }
+            "/ip/firewall/filter/enable" -> { filter.firstOrNull { it[".id"] == args[".id"] }?.put("disabled", "false"); emptyList() }
+            "/ip/service/print" -> listOf(
+                re(".id" to "*S1", "name" to "api", "port" to "8728", "address" to apiAddress, "disabled" to "false"),
+                re(".id" to "*S2", "name" to "winbox", "port" to "8291", "address" to "", "disabled" to "false"),
+            )
+            "/ip/service/set" -> { if (args[".id"] == "*S1") args["address"]?.let { apiAddress = it }; emptyList() }
             "/ip/cloud/print" -> listOf(re(*(listOf("ddns-enabled" to "auto", "status" to "updated", "public-address" to "41.203.12.7") +
                 (if (bth) listOf("back-to-home-vpn" to bthState, "vpn-status" to (if (bthState == "enabled") "BTH VPN is ready (using relay)" else "BTH VPN is disabled"))
                 else emptyList())).toTypedArray()))
@@ -143,6 +167,7 @@ class FakeRouterOs(
                 listOf(listOf("!done", "=ret=$id"))
             }
             "/ip/cloud/back-to-home-users/remove" -> { bthUsers.removeAll { it[".id"] == args[".id"] }; emptyList() }
+            "/ip/cloud/back-to-home-users/set" -> emptyList()
             "/ip/cloud/back-to-home-users/show-client-config" -> {
                 val id = args["numbers"] ?: args[".id"]
                 val n = bthUsers.indexOfFirst { it[".id"] == id }

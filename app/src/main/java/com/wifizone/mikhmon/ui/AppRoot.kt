@@ -117,7 +117,11 @@ fun AppRoot(activity: Activity) {
         Services.account.ping(listOfNotNull(id?.identity, id?.board, id?.version).joinToString(" · "))
         gateChecked = true
         // Le routeur sait-il faire l'accès à distance ? (l'offre n'est proposée que s'il le peut)
-        if (id != null) RemoteAccess.refreshSupport()
+        if (id != null) {
+            RemoteAccess.refreshSupport()
+            // Sur le Wi-Fi du routeur, accès à distance déjà activé : règle le pare-feu s'il le faut (une seule fois).
+            RemoteAccess.prepareRouter()
+        }
     }
 
     // Retours de la boutique : connexion (…://auth) et paiement (…://paiement).

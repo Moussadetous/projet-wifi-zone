@@ -87,6 +87,7 @@ fun SetupScreen(onDone: () -> Unit, onCancel: (() -> Unit)? = null) {
 
     fun save(host: String, p: Int, info: RouterInfo) {
         val session = Defaults.sessionName(info.identity.ifEmpty { old?.sessionName ?: "" })
+        if (old == null || old.routerIp != host || old.routerPort != p) com.wifizone.mikhmon.remote.RemoteAccess.forgetRouter()
         Services.settings.save(MikhmonSettings(
             routerIp = host, routerPort = p, routerUser = user.trim(), routerPass = pass,
             sessionName = session,
