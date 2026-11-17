@@ -29,7 +29,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var spinner: ProgressBar
     private var loggedIn = false
-    private var settings: MikhmonSettings? = null
+    private var cfg: MikhmonSettings? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
                 override fun shouldOverrideUrlLoading(v: WebView, r: android.webkit.WebResourceRequest) =
                     r.url.host != "127.0.0.1"
                 override fun onPageFinished(v: WebView, url: String) {
-                    val s = settings ?: return
+                    val s = cfg ?: return
                     if (!loggedIn && url.contains("id=login")) {
                         loggedIn = true
                         v.loadUrl("http://127.0.0.1:${s.port}/?hotspot=dashboard&session=" +
@@ -73,8 +73,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        settings = SettingsStore(this).load()
-        val s = settings
+        cfg = SettingsStore(this).load()
+        val s = cfg
         if (s == null) { startActivity(Intent(this, SetupActivity::class.java)); finish(); return }
         val f = IntentFilter(MikhmonService.ACTION_STATE)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, f, Context.RECEIVER_NOT_EXPORTED)
@@ -86,7 +86,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() { runCatching { unregisterReceiver(receiver) }; super.onStop() }
 
     private fun openMikhmon() {
-        val s = settings ?: return
+        val s = cfg ?: return
         spinner.visibility = View.GONE; status.visibility = View.GONE; web.visibility = View.VISIBLE
         if (web.url != null) return
         loggedIn = false
