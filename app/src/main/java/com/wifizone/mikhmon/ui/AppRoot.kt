@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -40,6 +41,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.wifizone.mikhmon.MikhmonServer
 import com.wifizone.mikhmon.MikhmonService
 import com.wifizone.mikhmon.Services
+import com.wifizone.mikhmon.remote.RemoteAccess
 import com.wifizone.mikhmon.router.HsUser
 import com.wifizone.mikhmon.tickets.gfx.Icon
 import com.wifizone.mikhmon.tickets.gfx.Icons
@@ -56,6 +58,8 @@ sealed interface Overlay {
     object Account : Overlay
     object Logs : Overlay
     object Setup : Overlay
+    /** Accès au routeur depuis n'importe où (Back To Home). */
+    object Remote : Overlay
     /**
      * Impression de tickets (générateur PDF avec aperçu). Les tickets sont donnés ([users]) ou lus sur le routeur :
      * un lot Mikhmon ([comment]), un profil ([profile]) ou un seul ticket ([userName]).
@@ -112,6 +116,8 @@ fun AppRoot(activity: Activity) {
         val id = runCatching { Services.router.resource() }.getOrNull()
         Services.account.ping(listOfNotNull(id?.identity, id?.board, id?.version).joinToString(" · "))
         gateChecked = true
+        // Le routeur sait-il faire l'accès à distance ? (l'offre n'est proposée que s'il le peut)
+        if (id != null) RemoteAccess.refreshSupport()
     }
 
     // Retours de la boutique : connexion (…://auth) et paiement (…://paiement).
@@ -136,6 +142,7 @@ fun AppRoot(activity: Activity) {
             "tickets" -> nav.tab = Tab.TICKETS
             "mikhmon" -> nav.tab = Tab.MIKHMON
             "journal" -> nav.open(Overlay.Logs)
+            "distance" -> nav.open(Overlay.Remote)
             "compte" -> nav.open(Overlay.Account)
             "accueil" -> nav.tab = Tab.HOME
             "studio" -> scope.launch {
@@ -186,7 +193,26 @@ fun AppRoot(activity: Activity) {
         is Overlay.Logs -> { LogScreen(nav); return }
         is Overlay.Setup -> { SetupScreen(onDone = { MikhmonServer.restart(activity); Services.router.reset(); nav.overlay = null }, onCancel = { nav.overlay = null }); return }
         is Overlay.Studio -> { StudioScreen(activity, nav, o); return }
+        is Overlay.Remote -> { RemoteScreen(activity, nav); return }
         is Overlay.MikhmonUrl, null -> {}
+    }
+
+    val support by RemoteAccess.support.collectAsState()
+    var promo by remember { mutableStateOf(false) }
+    LaunchedEffect(support, acc) {
+        if (support?.supported == true && acc?.unlocked == true && !RemoteAccess.paid && !RemoteAccess.promoShown) { promo = true; RemoteAccess.promoShown = true }
+    }
+    if (promo) {
+        val (price, perMonth) = remotePrice(acc?.itemPrice)
+        androidx.compose.ui.window.Dialog(onDismissRequest = { promo = false }) {
+            Column(Modifier.clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp)).background(Color.White).padding(10.dp)) {
+                RemoteHero(price, perMonth)
+                Text("Votre routeur sait le faire : activez-le en une minute, depuis son Wi-Fi.", color = Brand.Muted,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp))
+                BigButton("Découvrir", icon = Icons.GLOBE) { promo = false; nav.open(Overlay.Remote) }
+                androidx.compose.material3.TextButton({ promo = false }, Modifier.align(androidx.compose.ui.Alignment.CenterHorizontally)) { Text("Plus tard", color = Brand.Muted) }
+            }
+        }
     }
 
     Scaffold(

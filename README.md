@@ -24,6 +24,13 @@ Mikhmon v3 tout-en-un sur Android, sans Termux, avec un tableau de contrôle nat
 - **Mikhmon** : l'interface d'origine complète, déjà connectée. Ses boutons d'impression (Default, QR, Small, tickets
   à l'unité, après « Générer ») ouvrent l'impression de l'application avec aperçu ; un bouton **Premium** y est ajouté.
 - **Devise** : déduite du pays du téléphone (réseau, carte SIM, fuseau horaire), FCFA dans la zone UEMOA/CEMAC.
+- **Accès à distance** (option payante) : le routeur depuis la 4G ou n'importe quel Wi-Fi, grâce à « Back To Home »
+  de MikroTik (RouterOS 7.12+, la plupart des modèles). L'offre n'apparaît que si le routeur en est capable (sinon
+  « non disponible » dans Compte). 500 F/mois, payé par périodes de 2 mois : article « distance-AAAAMMJJ » de la
+  boutique au prix des articles (1 000 F), sans rien changer au serveur. Activation en un geste depuis le Wi-Fi du
+  routeur (utilisateur Back To Home créé par l'application), puis tunnel WireGuard intégré (bibliothèque officielle,
+  Apache 2.0) utilisé seulement par l'application et seulement vers le routeur ; bascule automatique Wi-Fi / distance
+  pour les écrans natifs et pour Mikhmon.
 - Raccourcis sur l'icône (appui long) : générer des tickets, clients, trafic, journal.
 
 ## Comment ça marche

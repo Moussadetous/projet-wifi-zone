@@ -14,8 +14,8 @@ android {
         applicationId = "com.wifizone.mikhmon"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         // arm64-v8a : téléphones ; x86_64 : émulateur de test en CI
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -59,6 +59,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.webkit:webkit:1.11.0")
     implementation("androidx.browser:browser:1.8.0")
+    // Accès à distance (Back To Home de MikroTik) : tunnel WireGuard officiel, intégré à l'application (Apache 2.0).
+    implementation("com.wireguard.android:tunnel:1.0.20230706")
     implementation("androidx.activity:activity-compose:1.9.1")
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")

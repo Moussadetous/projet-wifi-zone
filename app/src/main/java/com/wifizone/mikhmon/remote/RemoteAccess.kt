@@ -1,0 +1,219 @@
+package com.wifizone.mikhmon.remote
+
+import android.content.Context
+import android.content.Intent
+import android.net.VpnService
+import android.os.Build
+import com.wifizone.mikhmon.MikhmonSettings
+import com.wifizone.mikhmon.RouterOs
+import com.wifizone.mikhmon.RouterOsException
+import com.wifizone.mikhmon.Services
+import com.wifizone.mikhmon.WifiNetwork
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.android.backend.Tunnel
+import com.wireguard.config.Config
+import com.wireguard.config.Interface
+import com.wireguard.config.Peer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.Socket
+import java.time.LocalDate
+
+/**
+ * Accès au routeur depuis n'importe où, par « Back To Home » de MikroTik.
+ *  - Sur le Wi-Fi du routeur, rien ne change : connexion directe.
+ *  - Ailleurs (4G, autre Wi-Fi), si l'accès est payé et activé : tunnel WireGuard intégré à l'application. Seule cette
+ *    application l'utilise, et seulement pour joindre le routeur ; le reste du téléphone n'est pas touché.
+ *  - L'accès s'achète par périodes de 2 mois (articles « distance-AAAAMMJJ » de la boutique, voir RemotePlan).
+ */
+object RemoteAccess {
+    private val ctx: Context get() = Services.app
+    private val prefs by lazy { ctx.getSharedPreferences("remote", Context.MODE_PRIVATE) }
+    private val backend by lazy { GoBackend(ctx) }
+    @Volatile private var started = false
+    /** Adresse du routeur qui a répondu la dernière fois par le tunnel (passerelle BTH ou adresse du réseau local). */
+    @Volatile private var remoteHost: String? = null
+
+    private val tunnel = object : Tunnel {
+        override fun getName() = "mikhmon"
+        override fun onStateChange(newState: Tunnel.State) { up.value = newState == Tunnel.State.UP }
+    }
+
+    /** Tunnel actif en ce moment. */
+    val up = MutableStateFlow(false)
+    /** Compatibilité du routeur avec « Back To Home » (null : pas encore vérifiée). */
+    val support by lazy { MutableStateFlow(loadSupport()) }
+    /** Accès créé sur le routeur et enregistré sur ce téléphone. */
+    val configured by lazy { MutableStateFlow(config() != null) }
+
+    // ------------------------------------------------------------------ réglages
+    private fun loadSupport(): BackToHome.Support? = prefs.getString("support", null)?.let { s ->
+        runCatching {
+            val j = JSONObject(s)
+            BackToHome.Support(j.getBoolean("supported"), j.optString("version"), j.optString("reason"), j.optBoolean("enabled"), j.optString("status"))
+        }.getOrNull()
+    }
+
+    private fun saveSupport(s: BackToHome.Support) {
+        prefs.edit().putString("support", JSONObject().put("supported", s.supported).put("version", s.version).put("reason", s.reason)
+            .put("enabled", s.enabled).put("status", s.status).toString()).apply()
+        support.value = s
+    }
+
+    fun config(): WgConf? = prefs.getString("wg", null)?.let { WgConf.parse(it) }
+
+    private fun saveConfig(c: WgConf?) {
+        prefs.edit().apply { if (c == null) remove("wg") else putString("wg", c.text()) }.apply()
+        configured.value = c != null
+    }
+
+    /** Nom de ce téléphone sur le routeur (un accès « Back To Home » par appareil). */
+    val deviceName: String
+        get() = prefs.getString("device", null) ?: run {
+            val model = Build.MODEL.orEmpty().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(16).ifEmpty { "android" }
+            "mikhmon-$model-${(1000..9999).random()}".also { prefs.edit().putString("device", it).apply() }
+        }
+
+    /** Dernier jour d'accès payé (inclus), ou null. */
+    fun activeUntil(items: Collection<String>? = Services.account.account.value?.items): LocalDate? =
+        RemotePlan.activeUntil(items.orEmpty(), LocalDate.now())
+
+    val paid: Boolean get() = activeUntil() != null
+    val ready: Boolean get() = paid && config() != null
+
+    /** La publicité de l'accès à distance a-t-elle déjà été montrée en grand ? */
+    var promoShown: Boolean
+        get() = prefs.getBoolean("promoShown", false)
+        set(v) { prefs.edit().putBoolean("promoShown", v).apply() }
+
+    /** Autorisation « VPN » d'Android (demandée une seule fois) : null si déjà accordée. */
+    fun permissionIntent(): Intent? = VpnService.prepare(ctx)
+
+    // ------------------------------------------------------------------ Wi-Fi local ou distance
+    private fun sameLan(ip: String?, router: String) =
+        ip != null && WgConf.isIpv4(ip) && WgConf.isIpv4(router) && ip.substringBeforeLast('.') == router.substringBeforeLast('.')
+
+    /** Le téléphone est-il sur le réseau du routeur ? */
+    fun onRouterWifi(s: MikhmonSettings): Boolean {
+        if (s.routerIp.startsWith("127.")) return true // routeur sur le téléphone lui-même (tests)
+        val w = WifiNetwork.detect(ctx)
+        if (!w.connected) return false
+        if (!WgConf.isIpv4(s.routerIp)) return true
+        return w.gateway == s.routerIp || sameLan(w.ownIp, s.routerIp)
+    }
+
+    fun remoteMode(s: MikhmonSettings): Boolean = ready && !onRouterWifi(s)
+
+    // ------------------------------------------------------------------ tunnel
+    private fun build(c: WgConf, s: MikhmonSettings): Config {
+        // Le tunnel ne sert qu'à joindre le routeur : passerelle Back To Home et adresse du routeur sur son réseau.
+        val targets = listOfNotNull(c.routerAddress, s.routerIp.takeIf { WgConf.isIpv4(it) }).distinct().joinToString(", ") { "$it/32" }
+        val iface = Interface.Builder()
+            .parsePrivateKey(c.privateKey)
+            .parseAddresses(c.addresses.joinToString(", "))
+            .includeApplication(ctx.packageName)
+        c.mtu?.let { iface.setMtu(it) }
+        val peer = Peer.Builder()
+            .parsePublicKey(c.peerPublicKey)
+            .parseEndpoint(c.endpoint)
+            .parseAllowedIPs(targets)
+            .setPersistentKeepalive(c.keepalive ?: 25)
+        c.presharedKey?.let { peer.parsePreSharedKey(it) }
+        return Config.Builder().setInterface(iface.build()).addPeer(peer.build()).build()
+    }
+
+    /** Ouvre le tunnel si besoin (appel bloquant, hors du fil de l'interface). */
+    @Synchronized
+    fun ensureUp(s: MikhmonSettings) {
+        val c = config() ?: throw IllegalStateException("L'accès à distance n'est pas activé sur ce téléphone.")
+        if (!paid) throw IllegalStateException("Votre accès à distance a expiré : renouvelez-le (Compte › Accès à distance).")
+        if (permissionIntent() != null) throw IllegalStateException("Autorisez la connexion sécurisée (VPN) de l'application : Compte › Accès à distance.")
+        if (started && runCatching { backend.getState(tunnel) }.getOrNull() == Tunnel.State.UP) return
+        backend.setState(tunnel, Tunnel.State.UP, build(c, s))
+        started = true
+        up.value = true
+    }
+
+    /** Ferme le tunnel (de retour sur le Wi-Fi du routeur, ou accès désactivé). */
+    @Synchronized
+    fun down() {
+        if (!started) return
+        runCatching { backend.setState(tunnel, Tunnel.State.DOWN, null) }
+        started = false
+        up.value = false
+    }
+
+    // ------------------------------------------------------------------ connexions au routeur
+    private fun remoteHosts(s: MikhmonSettings): List<String> =
+        listOfNotNull(remoteHost, config()?.routerAddress, s.routerIp).distinct()
+
+    /** Connexion à l'API du routeur : en Wi-Fi local, sinon (accès payé et activé) par le tunnel. */
+    fun connect(s: MikhmonSettings, timeoutMs: Int = 8000, forceRemote: Boolean = false): RouterOs {
+        if (!forceRemote && !remoteMode(s)) {
+            down()
+            try {
+                return RouterOs.connect(s.routerIp, s.routerUser, s.routerPass, s.routerPort, timeoutMs) { WifiNetwork.socketFor(ctx, s.routerIp) }
+            } catch (e: RouterOsException) {
+                // Wi-Fi d'un autre lieu avec les mêmes adresses : on tente la connexion à distance.
+                if (!ready || e.kind != RouterOsException.Kind.UNREACHABLE) throw e
+            }
+        }
+        ensureUp(s)
+        var last: Exception? = null
+        for (h in remoteHosts(s)) {
+            try {
+                return RouterOs.connect(h, s.routerUser, s.routerPass, s.routerPort, 15000) { Socket() }.also { remoteHost = h }
+            } catch (e: RouterOsException) {
+                if (e.kind == RouterOsException.Kind.BAD_LOGIN) throw e
+                last = e
+            }
+        }
+        throw RouterOsException(RouterOsException.Kind.UNREACHABLE,
+            "Routeur injoignable à distance : vérifiez qu'il est allumé et connecté à Internet. (${last?.message ?: "aucune réponse"})")
+    }
+
+    /** Cible du pont de Mikhmon (PHP), à chaque nouvelle connexion. */
+    fun bridgeTarget(s: MikhmonSettings): Pair<String, Int> {
+        if (!remoteMode(s)) return s.routerIp to s.routerPort
+        ensureUp(s)
+        return (remoteHost ?: config()?.routerAddress ?: s.routerIp) to s.routerPort
+    }
+
+    fun bridgeSocket(host: String, s: MikhmonSettings): Socket = if (remoteMode(s)) Socket() else WifiNetwork.socketFor(ctx, host)
+
+    // ------------------------------------------------------------------ actions de l'écran « Accès à distance »
+    /** Vérifie (sur place) si le routeur sait faire « Back To Home ». */
+    suspend fun refreshSupport(): BackToHome.Support? = runCatching { Services.router.call { BackToHome.check(it) } }
+        .onSuccess { saveSupport(it) }.getOrNull()
+
+    /** Active « Back To Home » sur le routeur et enregistre l'accès de ce téléphone. */
+    suspend fun activate(): WgConf {
+        val c = Services.router.call { r -> BackToHome.setup(r, deviceName) }
+        saveConfig(c)
+        refreshSupport()
+        return c
+    }
+
+    /** Teste la connexion à distance (même sur le Wi-Fi du routeur) : renvoie le nom du routeur. */
+    suspend fun test(): String = withContext(Dispatchers.IO) {
+        val s = Services.settings.load() ?: throw IllegalStateException("Routeur non configuré")
+        connect(s, forceRemote = true).use { r -> r.command("/system/identity/print").firstOrNull()?.get("name").orEmpty() }
+    }
+
+    /** Retire l'accès de ce téléphone (sur le routeur si possible) et ferme le tunnel. */
+    suspend fun deactivate() {
+        runCatching { Services.router.call { BackToHome.remove(it, deviceName) } }
+        withContext(Dispatchers.IO) { down() }
+        saveConfig(null)
+        Services.router.reset()
+    }
+
+    /** Importe une configuration « Back To Home » copiée depuis Winbox ou l'application MikroTik. */
+    fun importConfig(text: String): WgConf {
+        val c = WgConf.parse(text) ?: throw IllegalArgumentException("Configuration WireGuard non reconnue.")
+        saveConfig(c)
+        return c
+    }
+}

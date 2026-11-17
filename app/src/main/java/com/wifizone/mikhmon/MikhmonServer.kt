@@ -61,9 +61,10 @@ object MikhmonServer {
             rt.install()
 
             // Pont 127.0.0.1:bridgePort -> routeur, forcé sur le Wi-Fi
+            // Wi-Fi du routeur : connexion directe ; ailleurs, par le tunnel de l'accès à distance (s'il est actif).
             val br = RouterBridge(
-                target = { store.load().let { (it?.routerIp ?: cfg.routerIp) to (it?.routerPort ?: cfg.routerPort) } },
-                socketFactory = { host -> WifiNetwork.socketFor(ctx, host) },
+                target = { com.wifizone.mikhmon.remote.RemoteAccess.bridgeTarget(store.load() ?: cfg) },
+                socketFactory = { host -> com.wifizone.mikhmon.remote.RemoteAccess.bridgeSocket(host, store.load() ?: cfg) },
             )
             var bridgePort = store.bridgePort
             if (!PortPicker.isFree(bridgePort)) {

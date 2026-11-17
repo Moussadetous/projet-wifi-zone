@@ -13,7 +13,16 @@ import kotlin.concurrent.thread
  * Faux routeur RouterOS pour les tests et les démonstrations : identité, ressources, profils au format Mikhmon,
  * utilisateurs (ajout / suppression / désactivation), clients connectés, interfaces et trafic, journal, baux DHCP.
  */
-class FakeRouterOs(private val user: String = "admin", private val pass: String = "secret") : Closeable {
+class FakeRouterOs(
+    private val user: String = "admin", private val pass: String = "secret",
+    /** Version de RouterOS annoncée ; « Back To Home » n'existe qu'à partir de 7.12. */
+    private val version: String = "7.16.1 (stable)",
+    /** Le modèle propose-t-il « Back To Home » (champ back-to-home-vpn de /ip/cloud) ? */
+    private val bth: Boolean = true,
+) : Closeable {
+    private var bthState = "disabled"
+    private val bthUsers = mutableListOf<Map<String, String>>()
+
     private val server = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
     val port: Int get() = server.localPort
     private val ids = AtomicInteger(100)
@@ -53,7 +62,7 @@ class FakeRouterOs(private val user: String = "admin", private val pass: String 
         fun re(vararg kv: Pair<String, String>) = listOf("!re") + kv.map { "=${it.first}=${it.second}" }
         return when (s[0]) {
             "/system/identity/print" -> listOf(re("name" to "Mon Routeur"))
-            "/system/resource/print" -> listOf(re("uptime" to "12d4h31m", "board-name" to "hAP ac²", "version" to "7.16.1 (stable)",
+            "/system/resource/print" -> listOf(re("uptime" to "12d4h31m", "board-name" to "hAP ac²", "version" to version,
                 "cpu-load" to "${8 + t % 17}", "free-memory" to "84213760", "total-memory" to "134217728", "free-hdd-space" to "9000000",
                 "total-hdd-space" to "16777216", "architecture-name" to "arm", "cpu-count" to "4"))
             "/system/clock/print" -> listOf(re("time-zone-name" to "Africa/Ouagadougou", "date" to "2026-11-17", "time" to "14:05:00"))
@@ -118,6 +127,31 @@ class FakeRouterOs(private val user: String = "admin", private val pass: String 
                 re(".id" to "*S2", "name" to "nov/17/2026-|-09:30:02-|-K7M4Q2-|-500-|-10.5.50.23-|-3C:2E:FF:41:8A:10-|-1d-|-1jour-|-vc-482-11.17.26-", "owner" to "nov2026", "comment" to "mikhmon"),
                 re(".id" to "*S3", "name" to "nov/16/2026-|-18:02:13-|-wz-48213-|-2500-|-10.5.50.31-|-A4:50:46:12:CC:07-|-7d-|-semaine-|-up-915-11.16.26-", "owner" to "nov2026", "comment" to "mikhmon"),
             )
+            "/ip/cloud/print" -> listOf(re(*(listOf("ddns-enabled" to "auto", "status" to "updated", "public-address" to "41.203.12.7") +
+                (if (bth) listOf("back-to-home-vpn" to bthState, "vpn-status" to (if (bthState == "enabled") "BTH VPN is ready (using relay)" else "BTH VPN is disabled"))
+                else emptyList())).toTypedArray()))
+            "/ip/cloud/set" -> {
+                if (!bth && args.containsKey("back-to-home-vpn")) listOf(listOf("!trap", "=message=expected end of command (line 1 column 10)"))
+                else { args["back-to-home-vpn"]?.let { bthState = it }; emptyList() }
+            }
+            "/ip/cloud/back-to-home-users/print" ->
+                if (!bth) listOf(listOf("!trap", "=message=no such command prefix"))
+                else bthUsers.map { u -> re(*u.entries.map { it.key to it.value }.toTypedArray()) }
+            "/ip/cloud/back-to-home-users/add" -> {
+                val id = "*B" + (bthUsers.size + 1)
+                bthUsers += mapOf(".id" to id, "name" to args["name"].orEmpty(), "allow-lan" to (args["allow-lan"] ?: "no"), "comment" to args["comment"].orEmpty())
+                listOf(listOf("!done", "=ret=$id"))
+            }
+            "/ip/cloud/back-to-home-users/remove" -> { bthUsers.removeAll { it[".id"] == args[".id"] }; emptyList() }
+            "/ip/cloud/back-to-home-users/show-client-config" -> {
+                val id = args["numbers"] ?: args[".id"]
+                val n = bthUsers.indexOfFirst { it[".id"] == id }
+                if (n < 0) listOf(listOf("!trap", "=message=no such item"))
+                else listOf(re("wg-client-config" to "[Interface]\nPrivateKey = r0KGQVZAhOlOp85cHpX1sMBqU47fuYfVZz+x8TbMIUw=\n" +
+                    "Address = 192.168.216.${n + 2}/32,fc00:0:0:216::${n + 2}/128\nDNS = 192.168.216.1,fc00:0:0:216::1\nMTU = 1420\n\n" +
+                    "[Peer]\nPublicKey = 4SHa/414EPJPFOH67MnaMei/wNaY4SrlIqwvdp13whQ=\nAllowedIPs = 0.0.0.0/0, ::/0\n" +
+                    "Endpoint = ab12cd34ef56.vpn.mynetname.net:15180\nPersistentKeepalive = 25\n"))
+            }
             else -> emptyList()
         }
     }

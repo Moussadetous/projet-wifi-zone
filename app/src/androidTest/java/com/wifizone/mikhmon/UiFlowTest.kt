@@ -9,13 +9,19 @@ import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import android.util.Log
+import com.wifizone.mikhmon.remote.RemoteAccess
+import com.wifizone.mikhmon.remote.RemotePlan
 import com.wifizone.mikhmon.testing.FakeRouterOs
 import com.wifizone.mikhmon.tickets.PaperFormat
 import com.wifizone.mikhmon.tickets.PrintSettings
+import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import java.time.LocalDate
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,6 +43,8 @@ class UiFlowTest {
         sh("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")
         sh("settings put global hide_error_dialogs 1")
         sh("cmd statusbar collapse")
+        // La publicité en grand de l'accès à distance n'est montrée qu'une fois : pas sur les autres captures.
+        RemoteAccess.promoShown = true
     }
 
     private fun sh(cmd: String) {
@@ -167,6 +175,45 @@ class UiFlowTest {
         Services.design.savePrint("mk-small", PrintSettings(PaperFormat.A4, perPage = 100))
         open("tickets", 6000, "14-tickets-stock")
         open("profil:1jour", 9000, "15-impression-profil-100")
+    }
+
+    /**
+     * Accès à distance (Back To Home) : publicité en premier plan (routeur compatible, accès pas encore pris), écran
+     * dédié, activation sur le routeur, puis vrai tunnel WireGuard (bibliothèque et service VPN d'Android).
+     */
+    @Test fun remoteAccess() {
+        routerReady()
+        Services.account.seedForTests(account("trial"))
+        runBlocking { RemoteAccess.refreshSupport() }
+        assertTrue("Le faux routeur (RouterOS 7.16) propose Back To Home", RemoteAccess.support.value?.supported == true)
+        RemoteAccess.promoShown = false
+        open(null, 7000, "16-acces-distance-pub")
+
+        // Accès payé (article « distance-AAAAMMJJ ») : écran dédié, puis activation sur le routeur.
+        Services.account.seedForTests(account("trial", listOf(RemotePlan.item(LocalDate.now()))))
+        assertTrue(RemoteAccess.paid)
+        open("distance", 5000, "17-acces-distance")
+        val c = runBlocking { RemoteAccess.activate() }
+        assertEquals("192.168.216.1", c.routerAddress)
+        open("distance", 5000, "18-acces-distance-actif")
+
+        // Vrai tunnel WireGuard (sans routeur au bout) : autorisation VPN accordée par le test.
+        sh("appops set ${ctx.packageName} ACTIVATE_VPN allow")
+        val i = Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ActivityScenario.launch<MainActivity>(i).use {
+            Thread.sleep(2000)
+            if (RemoteAccess.permissionIntent() == null) {
+                RemoteAccess.importConfig(c.copy(endpoint = "127.0.0.1:51820").text())
+                RemoteAccess.ensureUp(SettingsStore(ctx).load()!!)
+                assertTrue("Tunnel WireGuard ouvert", RemoteAccess.up.value)
+                Thread.sleep(1500)
+                RemoteAccess.down()
+                assertFalse(RemoteAccess.up.value)
+                Log.i("UiFlowTest", "Tunnel WireGuard : ouverture et fermeture réussies")
+            } else Log.w("UiFlowTest", "Autorisation VPN non accordée par appops : test du tunnel ignoré")
+        }
+        runBlocking { RemoteAccess.deactivate() }
+        assertFalse(RemoteAccess.configured.value)
     }
 
     @Test fun setupScreen() {

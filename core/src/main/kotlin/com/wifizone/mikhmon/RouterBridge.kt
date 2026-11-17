@@ -35,10 +35,11 @@ class RouterBridge(
     }
 
     private fun serve(client: Socket) {
-        val (host, port) = target()
-        val upstream = socketFactory(host)
+        // La cible peut échouer (ex. accès à distance expiré) : on ferme juste cette connexion.
+        val (host, port) = runCatching { target() }.getOrElse { runCatching { client.close() }; return }
+        val upstream = runCatching { socketFactory(host) }.getOrElse { runCatching { client.close() }; return }
         try {
-            upstream.connect(InetSocketAddress(host, port), 5000)
+            upstream.connect(InetSocketAddress(host, port), 10_000)
         } catch (e: Exception) {
             runCatching { client.close() }; runCatching { upstream.close() }; return
         }

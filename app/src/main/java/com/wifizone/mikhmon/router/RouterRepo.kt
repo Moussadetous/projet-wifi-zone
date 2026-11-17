@@ -49,7 +49,8 @@ class RouterRepo(private val ctx: Context) {
 
     private fun open(): RouterOs {
         val s = SettingsStore(ctx).load() ?: throw IllegalStateException("Routeur non configuré")
-        return RouterOs.connect(s.routerIp, s.routerUser, s.routerPass, s.routerPort, timeoutMs = 8000) { WifiNetwork.socketFor(ctx, s.routerIp) }
+        // Wi-Fi du routeur : connexion directe ; ailleurs, accès à distance (Back To Home) s'il est payé et activé.
+        return com.wifizone.mikhmon.remote.RemoteAccess.connect(s, timeoutMs = 8000)
     }
 
     suspend fun <T> call(block: (RouterOs) -> T): T = withContext(Dispatchers.IO) {

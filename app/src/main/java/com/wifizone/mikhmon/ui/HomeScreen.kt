@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wifizone.mikhmon.Services
+import com.wifizone.mikhmon.remote.RemoteAccess
 import com.wifizone.mikhmon.router.RouterRepo
 import com.wifizone.mikhmon.tickets.gfx.Icons
 
@@ -62,6 +63,27 @@ fun HomeScreen(activity: Activity, nav: Nav) {
                 Spacer(Modifier.width(10.dp))
                 Box(Modifier.size(42.dp).clip(CircleShape).background(Brand.Hero).clickable { nav.open(Overlay.Account) }, contentAlignment = Alignment.Center) {
                     Text(account?.name?.split(" ")?.take(2)?.joinToString("") { it.take(1) }?.uppercase()?.ifBlank { null } ?: "?", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        // Accès à distance : mis en avant si le routeur le permet et qu'il n'est pas encore pris ; sinon son état.
+        item {
+            val support by RemoteAccess.support.collectAsState()
+            val up by RemoteAccess.up.collectAsState()
+            val until = RemoteAccess.activeUntil(account?.items)
+            if (support?.supported == true && until == null) {
+                val (price, perMonth) = remotePrice(account?.itemPrice)
+                RemoteHero(price, perMonth, Modifier.padding(bottom = 12.dp)) { nav.open(Overlay.Remote) }
+            } else if (until != null) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(Color.White).clickable { nav.open(Overlay.Remote) }.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.GLOBE, if (up) Brand.Green else Brand.Indigo, 36.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (up) "Connecté à distance" else "Accès à distance actif", fontWeight = FontWeight.Bold)
+                        Text("Jusqu'au ${until.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))}", color = Brand.Muted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("›", color = Brand.Muted, style = MaterialTheme.typography.titleLarge)
                 }
             }
         }

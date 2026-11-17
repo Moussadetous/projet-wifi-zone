@@ -39,6 +39,7 @@ import com.wifizone.mikhmon.BuildConfig
 import com.wifizone.mikhmon.MikhmonServer
 import com.wifizone.mikhmon.MikhmonService
 import com.wifizone.mikhmon.Services
+import com.wifizone.mikhmon.remote.RemoteAccess
 import com.wifizone.mikhmon.tickets.Catalog
 import com.wifizone.mikhmon.tickets.gfx.Icon
 import com.wifizone.mikhmon.tickets.gfx.Icons
@@ -92,6 +93,21 @@ fun AccountScreen(activity: Activity, nav: Nav) {
                 Line(Icons.GLOBE, "Ouvrir mon compte sur la boutique", "Recharges, achats, factures") { Services.account.openBrowser(activity, Uri.parse(Services.account.shopUrl)) }
                 Line(Icons.USER, "Changer de compte", null) { scope.launch { Services.account.logout(); Services.account.startLogin(activity, chooseAccount = true) } }
                 Line(Icons.LOCK, "Se déconnecter", null, Brand.Red) { scope.launch { Services.account.logout(); nav.overlay = null } }
+            }
+            SectionTitle("Accès à distance")
+            Panel(Modifier.fillMaxWidth(), padding = 4.dp) {
+                val support by RemoteAccess.support.collectAsState()
+                val until = RemoteAccess.activeUntil(acc?.items)
+                val s = support
+                when {
+                    s == null -> Line(Icons.GLOBE, "Accès à distance", "Vérification au prochain passage sur le Wi-Fi du routeur") { nav.open(Overlay.Remote) }
+                    !s.supported -> Line(Icons.GLOBE, "Non disponible sur votre routeur", s.reason, Brand.Muted) { nav.open(Overlay.Remote) }
+                    until != null -> Line(Icons.GLOBE, "Actif jusqu'au ${until.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))}", "Gérer, tester, prolonger") { nav.open(Overlay.Remote) }
+                    else -> {
+                        val (price, perMonth) = remotePrice(acc?.itemPrice)
+                        Line(Icons.GLOBE, "Accédez à votre routeur partout", "${Fmt.money(perMonth, "F")} / mois · payé par 2 mois (${Fmt.money(price, "F")})") { nav.open(Overlay.Remote) }
+                    }
+                }
             }
             SectionTitle("Routeur")
             Panel(Modifier.fillMaxWidth(), padding = 4.dp) {
