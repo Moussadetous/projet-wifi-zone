@@ -2,8 +2,32 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+
 jobs:
+  php:
+    name: PHP pour Android (${{ matrix.abi }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        abi: [arm64-v8a, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: out/php/${{ matrix.abi }}
+          key: php-${{ matrix.abi }}-${{ hashFiles('scripts/build-php-android.sh') }}
+      - name: Compiler PHP avec le NDK
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./scripts/build-php-android.sh ${{ matrix.abi }} out/php/${{ matrix.abi }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: php-${{ matrix.abi }}
+          path: out/php/${{ matrix.abi }}/libphp.so
+
   apk:
+    name: APK + tests sur émulateur
+    needs: php
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -11,13 +35,43 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: "8.9" }
-      - name: Télécharger PHP et Mikhmon
-        run: ./scripts/fetch-assets.sh
-      - name: Tests unitaires
-        run: gradle :app:testDebugUnitTest
-      - name: APK debug
-        run: gradle :app:assembleDebug
+      - uses: actions/download-artifact@v4
+        with: { pattern: php-*, path: out/php }
+      - name: Installer PHP dans l'APK
+        run: |
+          for abi in arm64-v8a x86_64; do
+            install -D -m 755 out/php/php-$abi/libphp.so app/src/main/jniLibs/$abi/libphp.so
+          done
+      - name: Télécharger Mikhmon
+        run: ./scripts/fetch-mikhmon.sh
+      - name: Tests unitaires + APK
+        run: gradle --no-daemon :core:test :app:assembleDebug :app:assembleDebugAndroidTest
       - uses: actions/upload-artifact@v4
         with:
           name: mikhmon-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Tests sur émulateur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: gradle --no-daemon :app:connectedDebugAndroidTest || (adb logcat -d > logcat.txt; adb shell run-as com.wifizone.mikhmon cat files/php-server.log > php-server.log; exit 1)
+      - name: Rapports de test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports
+          path: |
+            core/build/reports/tests/
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            logcat.txt
+            php-server.log

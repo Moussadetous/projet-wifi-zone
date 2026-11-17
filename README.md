@@ -1,26 +1,35 @@
 # MikhmonDroid
 
-Mikhmon (v3) tout-en-un sur Android, sans Termux. À l'ouverture : l'application démarre un serveur PHP local
-(`127.0.0.1`, port rare 38000–39999), puis affiche Mikhmon déjà connecté dans une WebView.
+Mikhmon v3 tout-en-un sur Android, sans Termux.
 
-## Fonctionnement
-1. Premier lancement : formulaire (admin Mikhmon, IP/port API/identifiants du MikroTik, hotspot, devise).
-2. L'app écrit `include/config.php` de Mikhmon avec ces valeurs (`ConfigWriter.kt`).
-3. `MikhmonService` (service au premier plan) lance `libphp.so -S 127.0.0.1:PORT`.
-4. `MainActivity` se connecte automatiquement puis ouvre le tableau de bord du routeur.
+## Pour l'utilisateur
+1. Connectez le téléphone au Wi-Fi du MikroTik.
+2. Ouvrez l'application : l'adresse du routeur est détectée automatiquement.
+3. Entrez l'utilisateur et le mot de passe du routeur (ceux de Winbox) → **Se connecter**.
+4. Mikhmon s'ouvre, déjà connecté. Aux lancements suivants, il s'ouvre directement.
 
-Le binaire PHP est livré sous le nom `libphp.so` car Android n'autorise l'exécution que depuis
-le dossier des bibliothèques natives (`extractNativeLibs=true`).
+Le nom du routeur, le hotspot et son nom DNS sont lus sur le routeur ; la devise vient de la langue du téléphone.
+Le compte administrateur Mikhmon est généré et utilisé automatiquement.
+
+## Comment ça marche
+Android est un système Linux : l'application contient un **PHP compilé pour Android** (`libphp.so`,
+seul emplacement d'où Android autorise l'exécution) et les fichiers de **Mikhmon**. Au démarrage, le service
+`MikhmonService` lance `php -S 127.0.0.1:<port>` comme un processus normal — exactement ce que fait Termux, sans Termux.
+Le navigateur intégré (WebView) affiche alors Mikhmon et s'y connecte tout seul.
+
+Mikhmon joint le routeur via un **pont interne** (`RouterBridge`) dont les connexions sont forcées sur le Wi-Fi :
+ça marche même si le Wi-Fi du MikroTik n'a pas internet et que les données mobiles sont actives.
+
+En cas de problème, l'application affiche la cause (ex. « service API désactivé », « mot de passe incorrect »,
+« PHP s'est arrêté : SIGSYS ») et un rapport de diagnostic copiable.
+
+## Structure
+- `core/` : logique pure Kotlin testée sur JVM (format `config.php` de Mikhmon, client API RouterOS, pont, patch Mikhmon).
+- `app/` : application Android (écrans, service, exécution de PHP) + test sur émulateur (`ServerTest`).
+- `scripts/build-php-android.sh` : compile PHP avec le NDK Android (bionic).
+- `scripts/fetch-mikhmon.sh` : récupère Mikhmon v3 (GPL v2) à une version figée.
 
 ## Compiler
-```
-./scripts/fetch-assets.sh        # télécharge PHP statique arm64 + sources Mikhmon
-gradle :app:assembleDebug        # ou laissez GitHub Actions le faire (.github/workflows/build.yml)
-```
-
-## À valider sur un vrai téléphone (non testé ici : pas d'Android SDK dans l'environnement de dev)
-- URL du binaire PHP (`PHP_VERSION` / `PHP_URL` dans le script) et extensions nécessaires (sockets/session/json).
-- Format de `config.php` et champs du formulaire de login (`user`/`pass`) : écrits d'après Mikhmon v3 ;
-  `encrypt()` est vérifié contre l'implémentation PHP par `ConfigWriterTest`, mais pas contre le code de Mikhmon lui-même.
-- Licence de Mikhmon : vérifiez qu'elle autorise la redistribution dans un APK.
-- Les mots de passe sont stockés en clair dans les préférences privées de l'app (à migrer vers Keystore).
+La CI GitHub Actions (`.github/workflows/build.yml`) compile PHP, construit l'APK et le teste dans un émulateur.
+En local : `scripts/build-php-android.sh arm64-v8a out/php/arm64-v8a`, copier `libphp.so` dans
+`app/src/main/jniLibs/arm64-v8a/`, puis `scripts/fetch-mikhmon.sh` et `gradle :app:assembleDebug`.

@@ -6,3 +6,4 @@ local.properties
 # Téléchargés par scripts/fetch-assets.sh
 app/src/main/jniLibs/
 app/src/main/assets/mikhmon/
+out/
