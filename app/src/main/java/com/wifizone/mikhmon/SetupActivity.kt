@@ -53,6 +53,7 @@ class SetupActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, on ->
                 pass.inputType = InputType.TYPE_CLASS_TEXT or
                     if (on) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD
+                pass.typeface = android.graphics.Typeface.DEFAULT
                 pass.setSelection(pass.text.length)
             }
         }, 4)
@@ -103,6 +104,7 @@ class SetupActivity : AppCompatActivity() {
                 number -> InputType.TYPE_CLASS_NUMBER
                 else -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             }
+            typeface = android.graphics.Typeface.DEFAULT // Android met les champs mot de passe en police à chasse fixe
         }
 
     private fun refreshWifi() {
