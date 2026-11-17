@@ -65,12 +65,15 @@ class UiFlowTest {
         sh("screencap -p /data/local/tmp/mikhmon-$name.png")
     }
 
-    private fun account(status: String, items: List<String> = emptyList(), days: Long = 5): String {
+    private fun account(status: String, items: List<String> = emptyList(), days: Long = 5, pending: String? = null): String {
         val end = OffsetDateTime.now(ZoneOffset.UTC).plusDays(if (status == "trial") days else -1).withNano(0).toString()
+        val pend = if (pending == null) "null" else "{\"item\":\"$pending\",\"item_name\":\"\",\"price\":4000,\"amount\":5000,\"at\":\"$end\"}"
         return """{"user":{"id":"u1","name":"Awa Traoré","email":"awa@gmail.com","balance":1000},
             "app":{"id":"mikhmon-droid","name":"Mikhmon Android","trial_days":7,"lifetime_price":4000,"item_price":1000,"item_prices":{}},
             "license":{"status":"$status","trial_end":"$end","days_left":$days},
-            "items":[${items.joinToString(",") { "\"$it\"" }}],"pending":null,"currency":"francs CFA"}"""
+            "items":[${items.joinToString(",") { "\"$it\"" }}],
+            "pending":$pend,
+            "currency":"francs CFA"}"""
     }
 
     private fun routerReady() {
@@ -214,6 +217,20 @@ class UiFlowTest {
         }
         runBlocking { RemoteAccess.deactivate() }
         assertFalse(RemoteAccess.configured.value)
+    }
+
+    /**
+     * Paiement de l'accès à vie commencé puis abandonné (en attente 48 h sur la boutique) : les autres achats gardent
+     * leur bouton de paiement ; « J'ai payé : vérifier » n'apparaît que sous l'article concerné. Taille du code à 160 %.
+     */
+    @Test fun paymentButtonsWithPendingPayment() {
+        routerReady()
+        Services.account.seedForTests(account("trial", listOf("tpl-carte-saphir"), pending = "lifetime"))
+        Services.design.lastPremium = "tpl-aurore"
+        Services.design.saveOptions("tpl-aurore", com.wifizone.mikhmon.tickets.TicketOptions(codeScale = 1.6f))
+        Services.design.savePrint("tpl-aurore", PrintSettings(PaperFormat.A4, perPage = 10))
+        open("studio", 8000, "19-modele-a-payer-code-160")
+        open("compte", 4000, "20-paiement-en-attente")
     }
 
     @Test fun setupScreen() {

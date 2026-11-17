@@ -40,6 +40,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +94,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 private val SWATCHES = listOf(0xFF2563EB, 0xFF4338CA, 0xFF7C3AED, 0xFFDB2777, 0xFFE11D48, 0xFFEA580C, 0xFFD97706, 0xFF9A6B12,
     0xFF16A34A, 0xFF0D9488, 0xFF0891B2, 0xFF0F172A, 0xFF78350F, 0xFF4A0E1C).map { it.toInt() }
@@ -316,6 +318,26 @@ fun StudioScreen(activity: Activity, nav: Nav, studio: Overlay.Studio) {
                             }
                         }
 
+                        // ---------------------------------------------------------------- taille du code
+                        SectionTitle("Taille du code · ${(options.codeScale * 100).roundToInt()} %")
+                        Panel(Modifier.fillMaxWidth()) {
+                            CodeSizePreview(template, sample, branding, options, owned)
+                            Spacer(Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("A", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Brand.Muted)
+                                Slider(options.codeScale, { v -> options = options.copy(codeScale = (v * 20f).roundToInt() / 20f) },
+                                    valueRange = 0.7f..2f, steps = 25, modifier = Modifier.weight(1f).padding(horizontal = 10.dp))
+                                Text("A", fontSize = 26.sp, fontWeight = FontWeight.Black)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(1f, 1.3f, 1.6f, 2f).forEach { k ->
+                                    SelectChip("${(k * 100).roundToInt()} %", kotlin.math.abs(options.codeScale - k) < 0.01f) { options = options.copy(codeScale = k) }
+                                }
+                            }
+                            Text("Le code et le mot de passe grandissent sans sortir de leur place ; l'aperçu des pages suit le réglage.",
+                                color = Brand.Muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                        }
+
                         // ---------------------------------------------------------------- personnalisation
                         SectionTitle("Personnaliser", action = if (customize) "Masquer" else "Afficher") { customize = !customize }
                         if (!customize) Text("Couleurs, nom du Wi-Fi, contact, logo, QR code, prix…", color = Brand.Muted,
@@ -343,12 +365,8 @@ fun StudioScreen(activity: Activity, nav: Nav, studio: Overlay.Studio) {
                         } else go("pdf")
                     }
                 }
-            } else if (acc?.pending != null || purchase.waiting) {
-                BigButton("J'ai payé : vérifier", loading = purchase.busy) { purchase.check() }
             } else {
-                BigButton("Débloquer « ${template.name} » — ${Fmt.money(acc?.priceOf(template.id) ?: 1000, "F")}", brush = Brand.Premium, loading = purchase.busy, icon = Icons.SPARKLE) {
-                    purchase.buy(template.id, template.name)
-                }
+                BuyArea(purchase, acc, template.id, template.name, "Débloquer « ${template.name} » — ${Fmt.money(acc?.priceOf(template.id) ?: 1000, "F")}")
                 Text("Modèle acheté une fois, gardé à vie. Les formats Mikhmon, Standard et Mini sont gratuits.", color = Brand.Muted,
                     style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
             }
@@ -449,6 +467,23 @@ private fun PageViewer(page: Int, total: Int, selected: Boolean, locked: Boolean
                 TextButton({ onPage(page + 1) }, enabled = page < total - 1) { Text("Suivante ›", color = if (page < total - 1) Color.White else Color.Gray) }
             }
         }
+    }
+}
+
+/** Aperçu d'un ticket pour régler la taille du code. */
+@Composable
+private fun CodeSizePreview(template: TicketTemplate, sample: Voucher, branding: Branding, options: TicketOptions, owned: Boolean) {
+    val ctx = LocalContext.current
+    val bmp by produceState<Bitmap?>(null, template.id, options, branding) {
+        delay(40)
+        value = withContext(Dispatchers.Default) { Previews.ticket(ctx, template, sample, branding, options, 900) }
+    }
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFE6EAF2)).padding(12.dp), contentAlignment = Alignment.Center) {
+        val b = bmp
+        if (b != null) Image(b.asImageBitmap(), template.name, Modifier.fillMaxWidth(0.86f).aspectRatio(template.aspect).shadow(6.dp, RoundedCornerShape(10.dp)))
+        else Box(Modifier.fillMaxWidth(0.86f).aspectRatio(template.aspect))
+        if (!owned) Text("APERÇU", color = Color.White, fontWeight = FontWeight.Black, letterSpacing = 3.sp, fontSize = 10.sp,
+            modifier = Modifier.align(Alignment.TopStart).clip(RoundedCornerShape(8.dp)).background(Color(0xAA111827)).padding(horizontal = 6.dp, vertical = 2.dp))
     }
 }
 

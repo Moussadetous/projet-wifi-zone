@@ -52,7 +52,8 @@ import kotlinx.coroutines.launch
 /** Achat en un geste : solde suffisant = immédiat ; sinon page de paiement, et l'achat se termine tout seul. */
 class Purchase(private val activity: Activity, private val scope: CoroutineScope) {
     var busy by mutableStateOf(false)
-    var waiting by mutableStateOf(false)
+    /** Article dont la page de paiement vient d'être ouverte depuis cet écran. */
+    var waitingItem by mutableStateOf<String?>(null)
     var error by mutableStateOf<String?>(null)
     var askPhone by mutableStateOf<Pair<String, String>?>(null)
     var onDone: (() -> Unit)? = null
@@ -65,7 +66,7 @@ class Purchase(private val activity: Activity, private val scope: CoroutineScope
                 .onSuccess { r ->
                     when (r) {
                         com.wifizone.mikhmon.account.MproCore.Checkout.Done -> { Toast.makeText(activity, "Achat activé ✓", Toast.LENGTH_SHORT).show(); onDone?.invoke() }
-                        is com.wifizone.mikhmon.account.MproCore.Checkout.Pay -> { waiting = true; Services.account.openBrowser(activity, Uri.parse(r.url)) }
+                        is com.wifizone.mikhmon.account.MproCore.Checkout.Pay -> { waitingItem = item; Services.account.openBrowser(activity, Uri.parse(r.url)) }
                         is com.wifizone.mikhmon.account.MproCore.Checkout.NeedPhone -> askPhone = item to itemName
                         is com.wifizone.mikhmon.account.MproCore.Checkout.NeedEmail -> error = r.message
                     }
@@ -81,11 +82,50 @@ class Purchase(private val activity: Activity, private val scope: CoroutineScope
             busy = true
             repeat(6) {
                 val a = runCatching { Services.account.checkoutStatus() }.getOrNull()
-                if (a?.pending == null) { waiting = false; busy = false; return@launch }
+                if (a?.pendingItem == null) {
+                    if (waitingItem != null) Toast.makeText(activity, "Paiement confirmé ✓", Toast.LENGTH_SHORT).show()
+                    waitingItem = null; busy = false; return@launch
+                }
                 delay(2500)
             }
             busy = false
-            error = "Le paiement n'est pas encore confirmé. S'il a été fait, il sera pris en compte automatiquement dans quelques minutes."
+            error = "Le paiement n'est pas encore confirmé. S'il a été fait, il sera pris en compte automatiquement dans quelques minutes. " +
+                "Sinon, touchez de nouveau le bouton de paiement."
+        }
+    }
+
+    /** Abandonne le paiement en attente (on peut en relancer un à tout moment). */
+    fun cancel() {
+        scope.launch {
+            runCatching { Services.account.cancelPending() }
+            waitingItem = null
+        }
+    }
+
+    /** Un paiement de cet article attend-il sa confirmation (lancé ici ou depuis un autre appareil) ? */
+    fun pendingFor(acc: com.wifizone.mikhmon.account.MproCore.Account?, match: (String) -> Boolean): Boolean =
+        waitingItem?.let(match) == true || acc?.pendingItem?.let(match) == true
+}
+
+/**
+ * Bouton d'achat, toujours disponible : le solde du compte paie tout de suite, sinon la page de paiement s'ouvre.
+ * Si un paiement de CET article attend sa confirmation : « J'ai payé : vérifier » et « Annuler » en plus.
+ */
+@Composable
+fun BuyArea(
+    p: Purchase, acc: com.wifizone.mikhmon.account.MproCore.Account?, item: String, itemName: String, label: String,
+    brush: androidx.compose.ui.graphics.Brush = Brand.Premium, icon: com.wifizone.mikhmon.tickets.gfx.Icon? = Icons.SPARKLE,
+    match: (String) -> Boolean = { it == item },
+) {
+    BigButton(label, brush = brush, loading = p.busy, icon = icon) { p.buy(item, itemName) }
+    if (p.pendingFor(acc, match)) {
+        Spacer(Modifier.height(8.dp))
+        Column(Modifier.fillMaxWidth().clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp)).background(Brand.Indigo.copy(alpha = 0.07f)).padding(10.dp)) {
+            Text("Paiement lancé : dès qu'il est confirmé, l'achat s'active tout seul.", color = Brand.Indigo, style = MaterialTheme.typography.bodySmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton({ p.check() }, enabled = !p.busy) { Text("J'ai payé : vérifier") }
+                TextButton({ p.cancel() }, enabled = !p.busy) { Text("Annuler", color = Brand.Muted) }
+            }
         }
     }
 }
@@ -190,14 +230,7 @@ fun Gate(activity: Activity, acc: com.wifizone.mikhmon.account.MproCore.Account?
                     if (acc.balance > 0) Text("Solde de votre compte : ${Fmt.money(acc.balance, "F")}", color = Brand.Green, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp))
                 }
                 Spacer(Modifier.height(18.dp))
-                if (p.waiting || acc.pending != null) {
-                    Text("Paiement en cours de vérification…", color = Brand.Indigo, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(10.dp))
-                    BigButton("J'ai payé : vérifier", loading = p.busy) { p.check() }
-                    TextButton({ p.buy("lifetime") }) { Text("Rouvrir la page de paiement") }
-                } else {
-                    BigButton("Activer l'accès à vie — ${Fmt.money(acc.lifetimePrice, "F")}", brush = Brand.Premium, loading = p.busy, icon = Icons.CROWN) { p.buy("lifetime") }
-                }
+                BuyArea(p, acc, "lifetime", "", "Activer l'accès à vie — ${Fmt.money(acc.lifetimePrice, "F")}", icon = Icons.CROWN)
                 Spacer(Modifier.height(8.dp))
                 Text("Connecté : ${acc.name} · ${acc.email}", color = Brand.Muted, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
                 TextButton({ scope.launch { Services.account.logout() } }) { Text("Changer de compte") }

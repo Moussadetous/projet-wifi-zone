@@ -53,13 +53,13 @@ class PolaroidTemplate(id: String, name: String, palette: Palette, private val s
         val lab = Kit.style(FontFace.BOLD, 6.5f, 0.25f)
         val cw = if (qr != null) pw - 66f else pw
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), px, 160f, lab, p.muted)
-            Kit.text(c, t.v.username, px - 1f, 186f, Kit.style(FontFace.MONO_HEAVY, 22f, 0.04f), p.text, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), px, 160f - Kit.codeLift(t, 28f), lab, p.muted)
+            Kit.codeText(t, t.v.username, px - 1f, 186f, 22f, 0.04f, p.text, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", px, 158f, lab, p.muted)
-            Kit.text(c, t.v.username, px - 1f, 174f, Kit.style(FontFace.MONO_HEAVY, 14f, 0.03f), p.text, maxW = cw)
+            Kit.text(c, "UTILISATEUR", px, 158f - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, px - 1f, 174f, 14f, 0.03f, p.text, maxW = cw)
             Kit.text(c, "MOT DE PASSE", px, 188f, lab, p.muted)
-            Kit.text(c, pass, px - 1f, 204f, Kit.style(FontFace.MONO_HEAVY, 14f, 0.03f), p.primary, maxW = cw)
+            Kit.codeText(t, pass, px - 1f, 204f, 14f, 0.03f, p.primary, maxW = cw)
         }
         if (qr != null) Kit.qr(c, qr, px + pw - 60f, 150f, 60f, p.text, Colors.WHITE, 4f)
         val infos = Kit.infos(t)

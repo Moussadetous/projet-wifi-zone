@@ -33,17 +33,19 @@ class ThermalTemplate(id: String, name: String, private val withQr: Boolean) :
         val pass = t.v.password
         if (pass == null) {
             y += 16f
-            Kit.text(c, Kit.codeLabel(t), cx, y, Kit.style(FontFace.BOLD, 8f, 0.3f), k, Align.CENTER)
+            Kit.text(c, Kit.codeLabel(t), cx, y - Kit.codeLift(t, 28f), Kit.style(FontFace.BOLD, 8f, 0.3f), k, Align.CENTER)
             y += 32f
             // code en blanc sur bandeau noir
-            val st = Kit.fit(c, t.v.username, Kit.style(FontFace.MONO_HEAVY, 28f, 0.06f), w - 30f)
-            c.fill(VPath.round(8f, y - st.cap - 9f, w - 16f, st.cap + 18f, 6f), Solid(k))
-            c.text(t.v.username, cx, y, st, Solid(Colors.WHITE), Align.CENTER)
+            val base = Kit.style(FontFace.MONO_HEAVY, 28f, 0.06f)
+            val st = Kit.fit(c, t.v.username, Kit.codeStyle(t, 28f, 0.06f), w - 30f, minScale = 0.3f)
+            val yc = y + (st.cap - base.cap) / 2f
+            c.fill(VPath.round(8f, yc - st.cap - 9f, w - 16f, st.cap + 18f, 6f), Solid(k))
+            c.text(t.v.username, cx, yc, st, Solid(Colors.WHITE), Align.CENTER)
         } else {
             y += 22f
-            Kit.text(c, "UTILISATEUR : ${t.v.username}", cx, y, Kit.style(FontFace.MONO_HEAVY, 14f), k, Align.CENTER, maxW = w - 16f)
+            Kit.codeText(t, "UTILISATEUR : ${t.v.username}", cx, y, 14f, 0f, k, Align.CENTER, maxW = w - 16f)
             y += 22f
-            Kit.text(c, "MOT DE PASSE : $pass", cx, y, Kit.style(FontFace.MONO_HEAVY, 14f), k, Align.CENTER, maxW = w - 16f)
+            Kit.codeText(t, "MOT DE PASSE : $pass", cx, y, 14f, 0f, k, Align.CENTER, maxW = w - 16f)
         }
         y += 24f
         val infos = Kit.infos(t)

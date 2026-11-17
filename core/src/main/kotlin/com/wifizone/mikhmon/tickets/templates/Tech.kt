@@ -70,14 +70,14 @@ class TechTemplate(id: String, name: String, palette: Palette) :
         val pass = t.v.password
         if (pass == null) {
             Kit.text(c, "$ login --code", 26f, ty + 32f, mono, Colors.alpha(p.primary, 0.9f))
-            val st = Kit.text(c, t.v.username, 26f, ty + 64f, Kit.style(FontFace.MONO_HEAVY, 26f, 0.05f), p.text, maxW = tw - 40f)
+            val st = Kit.codeText(t, t.v.username, 26f, ty + 64f, 26f, 0.05f, p.text, maxW = tw - 40f)
             val cx = 26f + c.measure(t.v.username, st) + 5f
             c.fill(VPath.rect(cx, ty + 64f - st.cap, st.size * 0.5f, st.cap), Solid(Colors.alpha(p.primary, 0.85f)))
         } else {
             Kit.text(c, "$ login --user", 26f, ty + 31f, mono, Colors.alpha(p.primary, 0.9f))
-            Kit.text(c, t.v.username, 26f, ty + 47f, Kit.style(FontFace.MONO_HEAVY, 15f, 0.03f), p.text, maxW = tw - 40f)
+            Kit.codeText(t, t.v.username, 26f, ty + 47f, 15f, 0.03f, p.text, maxW = tw - 40f)
             Kit.text(c, "$ --password", 26f, ty + 62f, mono, Colors.alpha(p.primary, 0.9f))
-            Kit.text(c, pass, 26f, ty + 77f, Kit.style(FontFace.MONO_HEAVY, 15f, 0.03f), p.text, maxW = tw - 40f)
+            Kit.codeText(t, pass, 26f, ty + 77f, 15f, 0.03f, p.text, maxW = tw - 40f)
         }
         Kit.chips(c, Kit.infos(t), 14f, 142f, tw + 4f, 18f, Kit.style(FontFace.MONO, 8f), Colors.alpha(p.primary, 0.14f), p.text, p.primary, icons = t.o.showIcons)
         val foot = listOfNotNull(Kit.dns(t)?.let { "> $it" }, Kit.contact(t), Kit.serial(t)).joinToString("   ")

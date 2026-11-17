@@ -54,6 +54,8 @@ data class TicketOptions(
     val showIcons: Boolean = true,
     /** Libellés : « Code », « Identifiant »… */
     val codeLabel: String = "",
+    /** Taille du code et du mot de passe (1 = taille du modèle, de 0,7 à 2). */
+    val codeScale: Float = 1f,
 )
 
 /** Palette d'un modèle. */

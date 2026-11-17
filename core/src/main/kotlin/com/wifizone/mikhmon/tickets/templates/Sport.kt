@@ -35,13 +35,13 @@ class SportTemplate(id: String, name: String, palette: Palette) :
         Kit.text(c, t.o.badge.ifBlank { "PASS INTERNET" }.uppercase(), 18f, 52f, Kit.style(FontFace.BOLD_ITALIC, 8f, 0.2f), Colors.alpha(on, 0.8f), maxW = 160f)
         val pass = t.v.password
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 18f, 86f, Kit.style(FontFace.BOLD, 7f, 0.25f), Colors.alpha(on, 0.75f))
-            Kit.text(c, t.v.username, 17f, 116f, Kit.style(FontFace.MONO_HEAVY, 27f, 0.04f), on, maxW = 150f)
+            Kit.text(c, Kit.codeLabel(t), 18f, 86f - Kit.codeLift(t, 28f), Kit.style(FontFace.BOLD, 7f, 0.25f), Colors.alpha(on, 0.75f))
+            Kit.codeText(t, t.v.username, 17f, 116f, 27f, 0.04f, on, maxW = 150f)
         } else {
-            Kit.text(c, "UTILISATEUR", 18f, 80f, Kit.style(FontFace.BOLD, 7f, 0.25f), Colors.alpha(on, 0.75f))
-            Kit.text(c, t.v.username, 17f, 98f, Kit.style(FontFace.MONO_HEAVY, 16f, 0.03f), on, maxW = 140f)
+            Kit.text(c, "UTILISATEUR", 18f, 80f - Kit.codeLift(t, 17f), Kit.style(FontFace.BOLD, 7f, 0.25f), Colors.alpha(on, 0.75f))
+            Kit.codeText(t, t.v.username, 17f, 98f, 16f, 0.03f, on, maxW = 140f)
             Kit.text(c, "MOT DE PASSE", 18f, 114f, Kit.style(FontFace.BOLD, 7f, 0.25f), Colors.alpha(on, 0.75f))
-            Kit.text(c, pass, 17f, 132f, Kit.style(FontFace.MONO_HEAVY, 16f, 0.03f), on, maxW = 130f)
+            Kit.codeText(t, pass, 17f, 132f, 16f, 0.03f, on, maxW = 130f)
         }
         Kit.chips(c, Kit.infos(t).take(2), 16f, 146f, 138f, 18f, Kit.style(FontFace.BOLD, 8f), Colors.alpha(on, 0.18f), on, icons = t.o.showIcons)
         val foot = listOfNotNull(Kit.dns(t), Kit.contact(t)).joinToString("  ·  ")

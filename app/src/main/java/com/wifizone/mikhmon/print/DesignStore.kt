@@ -56,6 +56,7 @@ class DesignStore(private val ctx: Context) {
         return TicketOptions(
             primary = colors?.takeIf { it.has("p") }?.optInt("p"),
             accent = colors?.takeIf { it.has("a") }?.optInt("a"),
+            codeScale = colors?.optDouble("s", 1.0)?.toFloat()?.takeIf { !it.isNaN() } ?: 1f,
             headline = j.optString("headline"), footer = j.optString("footer"), badge = j.optString("badge"),
             motif = j.optString("motif").ifBlank { "wifi" },
             showQr = j.optBoolean("qr", true), showPrice = j.optBoolean("price", true), showLogo = j.optBoolean("logo", true),
@@ -70,6 +71,7 @@ class DesignStore(private val ctx: Context) {
         val c = JSONObject()
         o.primary?.let { c.put("p", it) }
         o.accent?.let { c.put("a", it) }
+        if (o.codeScale != 1f) c.put("s", o.codeScale.toDouble())
         colors.put(templateId, c)
         j.put("colors", colors).put("headline", o.headline).put("footer", o.footer).put("badge", o.badge).put("motif", o.motif)
             .put("qr", o.showQr).put("price", o.showPrice).put("logo", o.showLogo).put("contact", o.showContact)

@@ -72,13 +72,13 @@ class RibbonTemplate(id: String, name: String, palette: Palette, private val con
         val pass = t.v.password
         val lab = Kit.style(FontFace.BOLD, 7f, 0.25f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 24f, 82f, lab, p.muted)
-            Kit.text(c, t.v.username, 23f, 112f, Kit.style(FontFace.MONO_HEAVY, 28f, 0.05f), p.primary, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), 24f, 82f - Kit.codeLift(t, 28f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 23f, 112f, 28f, 0.05f, p.primary, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", 24f, 78f, lab, p.muted)
-            Kit.text(c, t.v.username, 23f, 97f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.primary, maxW = cw)
+            Kit.text(c, "UTILISATEUR", 24f, 78f - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 23f, 97f, 17f, 0.04f, p.primary, maxW = cw)
             Kit.text(c, "MOT DE PASSE", 24f, 113f, lab, p.muted)
-            Kit.text(c, pass, 23f, 132f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.text, maxW = cw)
+            Kit.codeText(t, pass, 23f, 132f, 17f, 0.04f, p.text, maxW = cw)
         }
         Kit.chips(c, Kit.infos(t), 21f, 142f, cw + 4f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f),
             Colors.alpha(p.primary, 0.10f), p.text, p.primary, icons = t.o.showIcons)

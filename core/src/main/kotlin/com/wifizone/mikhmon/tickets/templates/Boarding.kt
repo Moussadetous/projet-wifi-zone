@@ -47,13 +47,13 @@ class BoardingTemplate(id: String, name: String, palette: Palette) :
         val lab = Kit.style(FontFace.BOLD, 6.5f, 0.25f)
         val f1 = 16f; val fy = 100f
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), f1, fy, lab, p.muted)
-            Kit.text(c, t.v.username, f1, fy + 24f, Kit.style(FontFace.MONO_HEAVY, 22f, 0.06f), p.primary, maxW = 150f)
+            Kit.text(c, Kit.codeLabel(t), f1, fy - minOf(Kit.codeLift(t, 22f), 3f), lab, p.muted)
+            Kit.codeText(t, t.v.username, f1, fy + 24f, 22f, 0.06f, p.primary, maxW = 150f, maxScale = 1.4f, down = 0f)
         } else {
-            Kit.text(c, "UTILISATEUR", f1, fy, lab, p.muted)
-            Kit.text(c, t.v.username, f1, fy + 20f, Kit.style(FontFace.MONO_HEAVY, 16f, 0.04f), p.primary, maxW = 120f)
-            Kit.text(c, "MOT DE PASSE", f1 + 128f, fy, lab, p.muted)
-            Kit.text(c, pass, f1 + 128f, fy + 20f, Kit.style(FontFace.MONO_HEAVY, 16f, 0.04f), p.text, maxW = 100f)
+            Kit.text(c, "UTILISATEUR", f1, fy - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, f1, fy + 20f, 16f, 0.04f, p.primary, maxW = 120f, maxScale = 1.4f)
+            Kit.text(c, "MOT DE PASSE", f1 + 128f, fy - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, pass, f1 + 128f, fy + 20f, 16f, 0.04f, p.text, maxW = 100f, maxScale = 1.4f)
         }
         val fields = listOfNotNull(
             t.v.validity?.let { "VALIDITÉ" to it },

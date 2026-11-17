@@ -33,13 +33,13 @@ class MinimalTemplate(id: String, name: String, palette: Palette) :
         val pass = t.v.password
         val lab = Kit.style(FontFace.BOLD, 6.8f, 0.28f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 18f, 82f, lab, p.muted)
-            Kit.text(c, t.v.username, 16f, 114f, Kit.style(FontFace.MONO_HEAVY, 32f, 0.04f), p.text, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), 18f, 82f - Kit.codeLift(t, 28f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 16f, 114f, 32f, 0.04f, p.text, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", 18f, 80f, lab, p.muted)
-            Kit.text(c, t.v.username, 17f, 100f, Kit.style(FontFace.MONO_HEAVY, 18f, 0.03f), p.text, maxW = cw)
+            Kit.text(c, "UTILISATEUR", 18f, 80f - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 17f, 100f, 18f, 0.03f, p.text, maxW = cw)
             Kit.text(c, "MOT DE PASSE", 18f, 116f, lab, p.muted)
-            Kit.text(c, pass, 17f, 136f, Kit.style(FontFace.MONO_HEAVY, 18f, 0.03f), p.primary, maxW = cw)
+            Kit.codeText(t, pass, 17f, 136f, 18f, 0.03f, p.primary, maxW = cw)
         }
         Kit.chips(c, Kit.infos(t), 14f, 146f, cw + 6f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f), null, p.text, p.primary, gap = 2f, icons = t.o.showIcons)
         if (qr != null) {

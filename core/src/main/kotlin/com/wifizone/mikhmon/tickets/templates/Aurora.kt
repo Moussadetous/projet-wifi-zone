@@ -42,13 +42,13 @@ class AuroraTemplate(id: String, name: String, palette: Palette, private val thi
         val pass = t.v.password
         val lab = Kit.style(FontFace.BOLD, 7f, 0.25f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), px + 16f, py + 26f, lab, Colors.alpha(on, 0.8f))
-            Kit.text(c, t.v.username, px + 16f, py + 60f, Kit.style(FontFace.MONO_HEAVY, 30f, 0.06f), on, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), px + 16f, py + 26f - Kit.codeLift(t, 28f), lab, Colors.alpha(on, 0.8f))
+            Kit.codeText(t, t.v.username, px + 16f, py + 60f, 30f, 0.06f, on, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", px + 16f, py + 19f, lab, Colors.alpha(on, 0.8f))
-            Kit.text(c, t.v.username, px + 16f, py + 37f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), on, maxW = cw)
+            Kit.text(c, "UTILISATEUR", px + 16f, py + 19f - Kit.codeLift(t, 17f), lab, Colors.alpha(on, 0.8f))
+            Kit.codeText(t, t.v.username, px + 16f, py + 37f, 17f, 0.04f, on, maxW = cw)
             Kit.text(c, "MOT DE PASSE", px + 16f, py + 51f, lab, Colors.alpha(on, 0.8f))
-            Kit.text(c, pass, px + 16f, py + 69f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), on, maxW = cw)
+            Kit.codeText(t, pass, px + 16f, py + 69f, 17f, 0.04f, on, maxW = cw)
         }
         Kit.chips(c, Kit.infos(t), px + 13f, py + ph - 26f, cw + 6f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f),
             Colors.alpha(Colors.WHITE, 0.22f), on, icons = t.o.showIcons)

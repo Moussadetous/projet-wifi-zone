@@ -52,9 +52,9 @@ abstract class MikhmonFormat(id: String, name: String, w: Float, h: Float, descr
     }
 
     /** Case encadrée avec son texte centré (le code, l'identifiant ou le mot de passe). */
-    protected fun cell(c: Canvas2D, p: Palette, s: String, x: Float, y: Float, cw: Float, ch: Float, size: Float) {
+    protected fun cell(c: Canvas2D, p: Palette, s: String, x: Float, y: Float, cw: Float, ch: Float, size: Float, scale: Float = 1f) {
         c.stroke(VPath.rect(x, y, cw, ch), p.primary, Stroke(thin, round = false))
-        Kit.textMid(c, s, x + cw / 2f, y + ch / 2f, Kit.style(FontFace.BOLD, size), p.text, Align.CENTER, maxW = cw - 8f)
+        Kit.textMid(c, s, x + cw / 2f, y + ch / 2f, Kit.style(FontFace.BOLD, size * scale), p.text, Align.CENTER, maxW = cw - 8f)
     }
 
     protected fun label(c: Canvas2D, p: Palette, s: String, x: Float, y: Float, size: Float, maxW: Float) =
@@ -63,23 +63,24 @@ abstract class MikhmonFormat(id: String, name: String, w: Float, h: Float, descr
     /** Zone du code, centrée dans [x0, x1] ; [stacked] : identifiant et mot de passe l'un sous l'autre. */
     protected fun codes(t: TicketContext, x0: Float, x1: Float, top: Float, stacked: Boolean, labelSize: Float, codeSize: Float, cellH: Float) {
         val c = t.c; val p = t.p
+        val k = Kit.codeScale(t)
         val cw = x1 - x0
         val pass = t.v.password
         if (pass == null) {
             label(c, p, "Code du ticket", x0 + cw / 2f, top + labelSize, labelSize, cw)
-            cell(c, p, t.v.username, x0, top + labelSize + 6f, cw, cellH, codeSize)
+            cell(c, p, t.v.username, x0, top + labelSize + 6f, cw, cellH, codeSize, k)
         } else if (stacked) {
             label(c, p, "Utilisateur", x0 + cw / 2f, top + labelSize, labelSize, cw)
-            cell(c, p, t.v.username, x0, top + labelSize + 4f, cw, cellH * 0.8f, codeSize * 0.8f)
+            cell(c, p, t.v.username, x0, top + labelSize + 4f, cw, cellH * 0.8f, codeSize * 0.8f, k)
             val y2 = top + labelSize + 4f + cellH * 0.8f + 6f
             label(c, p, "Mot de passe", x0 + cw / 2f, y2 + labelSize, labelSize, cw)
-            cell(c, p, pass, x0, y2 + labelSize + 4f, cw, cellH * 0.8f, codeSize * 0.8f)
+            cell(c, p, pass, x0, y2 + labelSize + 4f, cw, cellH * 0.8f, codeSize * 0.8f, k)
         } else {
             val half = (cw - 6f) / 2f
             label(c, p, "Utilisateur", x0 + half / 2f, top + labelSize, labelSize, half)
             label(c, p, "Mot de passe", x1 - half / 2f, top + labelSize, labelSize, half)
-            cell(c, p, t.v.username, x0, top + labelSize + 6f, half, cellH, codeSize * 0.82f)
-            cell(c, p, pass, x1 - half, top + labelSize + 6f, half, cellH, codeSize * 0.82f)
+            cell(c, p, t.v.username, x0, top + labelSize + 6f, half, cellH, codeSize * 0.82f, k)
+            cell(c, p, pass, x1 - half, top + labelSize + 6f, half, cellH, codeSize * 0.82f, k)
         }
     }
 

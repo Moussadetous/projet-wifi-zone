@@ -42,6 +42,15 @@ class PreviewTest {
         }
     }
 
+    /** Réglage « Taille du code » : chaque modèle se dessine à 70 %, 160 % et 200 % (images si PREVIEW_DIR). */
+    @Test fun codeSizeSetting() {
+        for (tpl in Catalog.all) for (k in listOf(0.7f, 1.6f, 2f)) for ((i, v) in samples.withIndex()) {
+            val img = render(tpl, v, if (out != null) 2f else 1f, TicketOptions(showQr = i == 0, codeScale = k))
+            assertTrue(img.width > 0)
+            if (out != null && k == 1.6f) ImageIO.write(img, "png", File(out, "${tpl.id}-${i + 1}-code160.png"))
+        }
+    }
+
     @Test fun catalogIdsAreUnique() {
         val ids = Catalog.all.map { it.id }
         assertTrue(ids.size == ids.toSet().size)

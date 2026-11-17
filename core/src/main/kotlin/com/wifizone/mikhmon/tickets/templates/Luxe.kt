@@ -47,11 +47,11 @@ class LuxeTemplate(id: String, name: String, palette: Palette) :
         val al = if (qr != null) Align.LEFT else Align.CENTER
         val cw = if (qr != null) 190f else w - 70f
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), left, 106f, lab, Colors.alpha(p.text, 0.65f), al)
-            Kit.text(c, t.v.username, left, 136f, Kit.style(FontFace.MONO_HEAVY, 27f, 0.1f), p.text, al, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), left, 106f - Kit.codeLift(t, 28f), lab, Colors.alpha(p.text, 0.65f), al)
+            Kit.codeText(t, t.v.username, left, 136f, 27f, 0.1f, p.text, al, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR · ${t.v.username}", left, 112f, Kit.style(FontFace.MONO_HEAVY, 13f, 0.04f), p.text, al, maxW = cw)
-            Kit.text(c, "MOT DE PASSE · $pass", left, 132f, Kit.style(FontFace.MONO_HEAVY, 13f, 0.04f), p.text, al, maxW = cw)
+            Kit.codeText(t, "UTILISATEUR · ${t.v.username}", left, 112f, 13f, 0.04f, p.text, al, maxW = cw)
+            Kit.codeText(t, "MOT DE PASSE · $pass", left, 132f, 13f, 0.04f, p.text, al, maxW = cw)
         }
         val infos = Kit.infos(t).joinToString("  •  ") { it.second }
         val price = Kit.price(t)

@@ -51,6 +51,32 @@ object Kit {
         return st
     }
 
+    /** Réglage « Taille du code », borné pour rester lisible et dans le ticket. */
+    fun codeScale(t: TicketContext): Float = t.o.codeScale.coerceIn(0.7f, 2f)
+
+    /** Style du code (identifiant / mot de passe) agrandi ou réduit selon le réglage « Taille du code ». */
+    fun codeStyle(t: TicketContext, size: Float, tracking: Float = 0f) = TextStyle(FontFace.MONO_HEAVY, size * codeScale(t), tracking)
+
+    /**
+     * Dessine le code (ou le mot de passe) à la taille réglée : il reste centré sur sa place d'origine (il grandit
+     * vers le haut et vers le bas) et ne dépasse jamais la largeur [maxW] prévue par le modèle.
+     */
+    fun codeText(t: TicketContext, s: String, x: Float, y: Float, size: Float, tracking: Float, color: Int,
+                 align: Align = Align.LEFT, maxW: Float = 0f, maxScale: Float = 2f, down: Float = 0.5f): TextStyle {
+        if (s.isBlank()) return codeStyle(t, size, tracking)
+        val base = TextStyle(FontFace.MONO_HEAVY, size, tracking)
+        // [maxScale] : zone du modèle trop étroite en hauteur pour grandir davantage.
+        val want = base.sized(size * minOf(codeScale(t), maxScale))
+        val st = if (maxW > 0f) fit(t.c, s, want, maxW, minScale = 0.3f) else want
+        // [down] : part de l'agrandissement prise vers le bas (0,5 : centré ; 0 : le code ne grandit que vers le haut).
+        val dy = (st.cap - base.cap) * down
+        t.c.text(s, x, y + dy, st, Solid(color), align)
+        return st
+    }
+
+    /** De combien remonter le libellé posé au-dessus d'un code agrandi (code de taille [size] dans le modèle). */
+    fun codeLift(t: TicketContext, size: Float): Float = (size * FontFace.MONO_HEAVY.capHeight * (codeScale(t) - 1f) / 2f).coerceAtLeast(0f)
+
     fun price(t: TicketContext): String? {
         val p = t.v.price?.trim().orEmpty()
         if (!t.o.showPrice || p.isEmpty() || p == "0") return null

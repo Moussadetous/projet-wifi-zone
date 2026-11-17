@@ -29,12 +29,12 @@ class StandardTemplate : TicketTemplate("std-standard", "Standard", Category.CLA
         val pass = t.v.password
         if (pass == null) {
             Kit.text(c, "Code", 12f, 54f, Kit.style(FontFace.MEDIUM, 9f), p.muted)
-            Kit.text(c, t.v.username, 12f, 84f, Kit.style(FontFace.MONO_HEAVY, 26f, 0.04f), p.text, maxW = cw)
+            Kit.codeText(t, t.v.username, 12f, 84f, 26f, 0.04f, p.text, maxW = cw)
         } else {
             Kit.text(c, "Utilisateur", 12f, 52f, Kit.style(FontFace.MEDIUM, 9f), p.muted)
-            Kit.text(c, t.v.username, 12f, 70f, Kit.style(FontFace.MONO_HEAVY, 16f), p.text, maxW = cw)
+            Kit.codeText(t, t.v.username, 12f, 70f, 16f, 0f, p.text, maxW = cw)
             Kit.text(c, "Mot de passe", 12f, 86f, Kit.style(FontFace.MEDIUM, 9f), p.muted)
-            Kit.text(c, pass, 12f, 104f, Kit.style(FontFace.MONO_HEAVY, 16f), p.text, maxW = cw)
+            Kit.codeText(t, pass, 12f, 104f, 16f, 0f, p.text, maxW = cw)
         }
         val info = Kit.infos(t).joinToString("   ") { it.second }
         Kit.text(c, info, 12f, 128f, Kit.style(FontFace.SEMIBOLD, 10f), p.text, maxW = cw)
@@ -55,10 +55,10 @@ class MiniTemplate : TicketTemplate("std-mini", "Mini", Category.CLASSIC, false,
         Kit.text(c, Kit.headline(t), 9f, 17f, Kit.style(FontFace.BOLD, 9.5f), p.text, maxW = 120f)
         Kit.price(t)?.let { Kit.text(c, it, w - 9f, 17f, Kit.style(FontFace.BLACK, 10f), p.text, Align.RIGHT, maxW = 70f) }
         val pass = t.v.password
-        if (pass == null) Kit.text(c, t.v.username, w / 2f, 58f, Kit.style(FontFace.MONO_HEAVY, 24f, 0.05f), p.text, Align.CENTER, maxW = w - 18f)
+        if (pass == null) Kit.codeText(t, t.v.username, w / 2f, 58f, 24f, 0.05f, p.text, Align.CENTER, maxW = w - 18f)
         else {
-            Kit.text(c, "U : ${t.v.username}", 9f, 44f, Kit.style(FontFace.MONO_HEAVY, 13f), p.text, maxW = w - 18f)
-            Kit.text(c, "P : $pass", 9f, 62f, Kit.style(FontFace.MONO_HEAVY, 13f), p.text, maxW = w - 18f)
+            Kit.codeText(t, "U : ${t.v.username}", 9f, 44f, 13f, 0f, p.text, maxW = w - 18f)
+            Kit.codeText(t, "P : $pass", 9f, 62f, 13f, 0f, p.text, maxW = w - 18f)
         }
         val info = Kit.infos(t).joinToString("  ·  ") { it.second }
         Kit.text(c, info, w / 2f, 80f, Kit.style(FontFace.SEMIBOLD, 8f), p.text, Align.CENTER, maxW = w - 18f)

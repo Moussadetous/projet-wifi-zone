@@ -43,6 +43,8 @@ class MproCore(
         val status: String, val daysLeft: Int, val trialEnd: String?,
         val items: Set<String>, val lifetimePrice: Long, val itemPrice: Long, val itemPrices: Map<String, Long>,
         val currency: String, val pending: String?, val checkedAt: Long,
+        /** Article dont le paiement attend sa confirmation (« lifetime », un modèle…), ou null. */
+        val pendingItem: String? = null,
     ) {
         val unlocked get() = status == "lifetime" || status == "trial"
         fun priceOf(item: String) = itemPrices[item] ?: itemPrice
@@ -183,6 +185,7 @@ class MproCore(
             currency = j.optString("currency").ifBlank { "FCFA" },
             pending = pend?.let { if (it.optString("item") == "lifetime") "l’accès à vie" else it.optString("item_name").ifBlank { it.optString("item") } },
             checkedAt = checkedAt,
+            pendingItem = pend?.optString("item")?.ifBlank { null },
         )
     }
 

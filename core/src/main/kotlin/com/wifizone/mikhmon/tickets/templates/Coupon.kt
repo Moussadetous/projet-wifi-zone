@@ -49,12 +49,12 @@ class CouponTemplate(id: String, name: String, palette: Palette) :
         c.stroke(VPath.round(20f, by, cw, bh, 8f), Colors.alpha(p.text, 0.25f), Stroke(1f))
         val pass = t.v.password
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 30f, by + 14f, Kit.style(FontFace.BOLD, 6.5f, 0.25f), p.muted)
-            Kit.text(c, t.v.username, 20f + cw / 2f, by + 42f, Kit.style(FontFace.MONO_HEAVY, 25f, 0.08f), p.text, Align.CENTER, maxW = cw - 20f)
+            Kit.text(c, Kit.codeLabel(t), 30f, by + 14f - Kit.codeLift(t, 28f), Kit.style(FontFace.BOLD, 6.5f, 0.25f), p.muted)
+            Kit.codeText(t, t.v.username, 20f + cw / 2f, by + 42f, 25f, 0.08f, p.text, Align.CENTER, maxW = cw - 20f)
         } else {
-            Kit.text(c, "UTILISATEUR", 30f, by + 14f, Kit.style(FontFace.BOLD, 6.5f, 0.25f), p.muted)
-            Kit.text(c, t.v.username, 30f, by + 30f, Kit.style(FontFace.MONO_HEAVY, 14f, 0.04f), p.text, maxW = cw - 20f)
-            Kit.text(c, "MOT DE PASSE  $pass", 30f, by + 45f, Kit.style(FontFace.MONO_HEAVY, 12f, 0.04f), p.primary, maxW = cw - 20f)
+            Kit.text(c, "UTILISATEUR", 30f, by + 14f - Kit.codeLift(t, 17f), Kit.style(FontFace.BOLD, 6.5f, 0.25f), p.muted)
+            Kit.codeText(t, t.v.username, 30f, by + 30f - Kit.codeLift(t, 14f), 14f, 0.04f, p.text, maxW = cw - 20f, maxScale = 1.6f)
+            Kit.codeText(t, "MOT DE PASSE  $pass", 30f, by + 45f + Kit.codeLift(t, 12f), 12f, 0.04f, p.primary, maxW = cw - 20f, maxScale = 1.6f)
         }
         Kit.chips(c, Kit.infos(t), 18f, 130f, cw + 4f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f), null, p.text, p.primary, gap = 1f, icons = t.o.showIcons)
         val foot = listOfNotNull(Kit.dns(t)?.let { "Connexion : $it" }, Kit.contact(t), Kit.serial(t)).joinToString("   ·   ")

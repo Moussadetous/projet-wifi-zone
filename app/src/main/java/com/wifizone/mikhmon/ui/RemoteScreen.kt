@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -141,11 +140,8 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                     }
                     Spacer(Modifier.height(14.dp))
                     when {
-                        until == null && (purchase.waiting || acc?.pending != null) ->
-                            BigButton("J'ai payé : vérifier", loading = purchase.busy) { purchase.check() }
-                        until == null -> BigButton("Payer ${Fmt.money(price, "F")} · 2 mois", brush = Brand.Premium, loading = purchase.busy, icon = Icons.GLOBE) {
-                            purchase.buy(RemotePlan.item(start), RemotePlan.label(start))
-                        }
+                        until == null -> BuyArea(purchase, acc, RemotePlan.item(start), RemotePlan.label(start), "Payer ${Fmt.money(price, "F")} · 2 mois",
+                            icon = Icons.GLOBE, match = { it.startsWith(RemotePlan.PREFIX) })
                         !configured -> {
                             BigButton("Activer sur le routeur", enabled = onWifi, loading = busy == "activate", icon = Icons.SHIELD) {
                                 withVpn { act("activate", { "Accès à distance activé ✓\nVous pouvez maintenant joindre votre routeur depuis la 4G ou un autre Wi-Fi." }) { RemoteAccess.activate(); "" } }
@@ -159,9 +155,9 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
                     }
                     if (until != null) {
                         Spacer(Modifier.height(10.dp))
-                        OutlinedButton({ purchase.buy(RemotePlan.item(start), RemotePlan.label(start)) }, Modifier.fillMaxWidth()) {
-                            Text("Prolonger de 2 mois · ${Fmt.money(price, "F")} (à partir du ${start.format(DAY)})")
-                        }
+                        BuyArea(purchase, acc, RemotePlan.item(start), RemotePlan.label(start),
+                            "Prolonger de 2 mois · ${Fmt.money(price, "F")} (dès le ${start.format(DAY)})", brush = Brand.Hero,
+                            icon = Icons.CALENDAR, match = { it.startsWith(RemotePlan.PREFIX) })
                     }
                     SectionTitle("Comment ça marche")
                     Panel(Modifier.fillMaxWidth()) {

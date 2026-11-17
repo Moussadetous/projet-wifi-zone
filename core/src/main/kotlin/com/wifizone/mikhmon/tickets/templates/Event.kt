@@ -43,13 +43,13 @@ class EventTemplate(id: String, name: String, palette: Palette) :
         val pass = t.v.password
         val label = Kit.style(FontFace.BOLD, 7f, 0.22f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), x0, 66f, label, p.muted)
-            Kit.text(c, t.v.username, x0, 98f, Kit.style(FontFace.MONO_HEAVY, 30f, 0.06f), p.primary, maxW = mw)
+            Kit.text(c, Kit.codeLabel(t), x0, 66f - Kit.codeLift(t, 28f), label, p.muted)
+            Kit.codeText(t, t.v.username, x0, 98f, 30f, 0.06f, p.primary, maxW = mw)
         } else {
-            Kit.text(c, "UTILISATEUR", x0, 64f, label, p.muted)
-            Kit.text(c, t.v.username, x0, 86f, Kit.style(FontFace.MONO_HEAVY, 19f, 0.04f), p.primary, maxW = mw * 0.5f)
-            Kit.text(c, "MOT DE PASSE", x0 + mw * 0.53f, 64f, label, p.muted)
-            Kit.text(c, pass, x0 + mw * 0.53f, 86f, Kit.style(FontFace.MONO_HEAVY, 19f, 0.04f), p.text, maxW = mw * 0.47f)
+            Kit.text(c, "UTILISATEUR", x0, 64f - Kit.codeLift(t, 17f), label, p.muted)
+            Kit.codeText(t, t.v.username, x0, 86f, 19f, 0.04f, p.primary, maxW = mw * 0.5f)
+            Kit.text(c, "MOT DE PASSE", x0 + mw * 0.53f, 64f - Kit.codeLift(t, 17f), label, p.muted)
+            Kit.codeText(t, pass, x0 + mw * 0.53f, 86f, 19f, 0.04f, p.text, maxW = mw * 0.47f)
         }
         Kit.chips(c, Kit.infos(t), x0 - 2f, 112f, mw + 4f, 20f, Kit.style(FontFace.SEMIBOLD, 8.6f),
             Colors.alpha(p.primary, 0.10f), p.text, p.primary, icons = t.o.showIcons)

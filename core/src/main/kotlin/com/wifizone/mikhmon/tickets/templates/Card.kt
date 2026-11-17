@@ -63,12 +63,12 @@ class CardTemplate(id: String, name: String, palette: Palette, private val chipG
         val pass = t.v.password
         val label = Kit.style(FontFace.SEMIBOLD, 7.5f, 0.2f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 22f, 128f, label, soft)
+            Kit.text(c, Kit.codeLabel(t), 22f, 128f - Kit.codeLift(t, 28f), label, soft)
             embossed(t, t.v.username, 22f, 158f, 30f, codeW)
         } else {
-            Kit.text(c, "UTILISATEUR", 22f, 126f, label, soft)
+            Kit.text(c, "UTILISATEUR", 22f, 126f - Kit.codeLift(t, 17f), label, soft)
             embossed(t, t.v.username, 22f, 148f, 20f, codeW * 0.52f)
-            Kit.text(c, "MOT DE PASSE", 22f + codeW * 0.55f, 126f, label, soft)
+            Kit.text(c, "MOT DE PASSE", 22f + codeW * 0.55f, 126f - Kit.codeLift(t, 17f), label, soft)
             embossed(t, pass, 22f + codeW * 0.55f, 148f, 20f, codeW * 0.45f)
         }
         // forfait
@@ -82,8 +82,11 @@ class CardTemplate(id: String, name: String, palette: Palette, private val chipG
     }
 
     /** Code en relief : ombre sombre décalée puis texte clair. */
-    private fun embossed(t: TicketContext, s: String, x: Float, y: Float, size: Float, maxW: Float) {
-        val st = Kit.fit(t.c, s, Kit.style(FontFace.MONO_HEAVY, size, 0.08f), maxW)
+    private fun embossed(t: TicketContext, s: String, x: Float, y0: Float, size: Float, maxW: Float) {
+        // Taille du code réglable : le code reste centré sur sa place.
+        val base = Kit.style(FontFace.MONO_HEAVY, size, 0.08f)
+        val st = Kit.fit(t.c, s, Kit.codeStyle(t, size, 0.08f), maxW, minScale = 0.3f)
+        val y = y0 + (st.cap - base.cap) / 2f
         t.c.text(s, x + 1.2f, y + 1.4f, st, Solid(Colors.alpha(Colors.BLACK, 0.35f)))
         t.c.text(s, x, y, st, Linear(x, y - st.cap, x, y, intArrayOf(Colors.WHITE, Colors.lighten(t.p.accent, 0.35f))))
     }

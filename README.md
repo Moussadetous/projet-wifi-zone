@@ -20,7 +20,10 @@ Mikhmon v3 tout-en-un sur Android, sans Termux, avec un tableau de contrôle nat
   46 modèles premium ; **nombre de tickets par feuille au choix** (taille réelle, 8, 24, 100…, la grille s'adapte),
   **aperçu de chaque page**, choix des pages, **impression Android** (imprimantes, « Enregistrer en PDF ») ou
   **PDF natif** dans Téléchargements/Mikhmon. Couleurs, textes, motif ou logo, QR de connexion automatique,
-  papier A4 / A5 / Lettre / rouleaux 58 et 80 mm. Chaque modèle premium s'achète une fois (prix réglé sur la boutique).
+  papier A4 / A5 / Lettre / rouleaux 58 et 80 mm. **Taille du code réglable** (70 à 200 %, pour chaque modèle).
+  Chaque modèle premium s'achète une fois (prix réglé sur la boutique).
+- **Achats** : le bouton de paiement reste toujours disponible (solde du compte, sinon page de paiement) ; un paiement
+  commencé et non terminé n'affiche « J'ai payé : vérifier » et « Annuler » que sous l'article concerné.
 - **Mikhmon** : l'interface d'origine complète, déjà connectée. Ses boutons d'impression (Default, QR, Small, tickets
   à l'unité, après « Générer ») ouvrent l'impression de l'application avec aperçu ; un bouton **Premium** y est ajouté.
 - **Devise** : déduite du pays du téléphone (réseau, carte SIM, fuseau horaire), FCFA dans la zone UEMOA/CEMAC.

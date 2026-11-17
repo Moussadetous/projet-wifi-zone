@@ -60,13 +60,13 @@ class WaveTemplate(id: String, name: String, palette: Palette) :
         val pass = t.v.password
         val lab = Kit.style(FontFace.BOLD, 7f, 0.25f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 20f, 76f, lab, p.muted)
-            Kit.text(c, t.v.username, 19f, 106f, Kit.style(FontFace.MONO_HEAVY, 28f, 0.05f), p.text, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), 20f, 76f - Kit.codeLift(t, 28f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 19f, 106f, 28f, 0.05f, p.text, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", 20f, 72f, lab, p.muted)
-            Kit.text(c, t.v.username, 19f, 91f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.text, maxW = cw)
+            Kit.text(c, "UTILISATEUR", 20f, 72f - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, 19f, 91f, 17f, 0.04f, p.text, maxW = cw)
             Kit.text(c, "MOT DE PASSE", 20f, 106f, lab, p.muted)
-            Kit.text(c, pass, 19f, 125f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.primary, maxW = cw)
+            Kit.codeText(t, pass, 19f, 125f, 17f, 0.04f, p.primary, maxW = cw)
         }
         Kit.chips(c, Kit.infos(t), 17f, 133f, cw + 4f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f),
             Colors.alpha(p.primary, 0.10f), p.text, p.primary, icons = t.o.showIcons)

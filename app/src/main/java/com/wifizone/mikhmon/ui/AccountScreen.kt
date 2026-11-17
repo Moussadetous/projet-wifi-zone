@@ -80,8 +80,7 @@ fun AccountScreen(activity: Activity, nav: Nav) {
                     }
                     if (a.status != "lifetime") {
                         Spacer(Modifier.height(14.dp))
-                        if (p.waiting || a.pending != null) BigButton("J'ai payé : vérifier", loading = p.busy) { p.check() }
-                        else BigButton("Activer l'accès à vie — ${Fmt.money(a.lifetimePrice, "F")}", brush = Brand.Premium, loading = p.busy, icon = Icons.CROWN) { p.buy("lifetime") }
+                        BuyArea(p, a, "lifetime", "", "Activer l'accès à vie — ${Fmt.money(a.lifetimePrice, "F")}", icon = Icons.CROWN)
                     }
                     Spacer(Modifier.height(10.dp))
                     val owned = Catalog.premium.count { it.id in a.items }

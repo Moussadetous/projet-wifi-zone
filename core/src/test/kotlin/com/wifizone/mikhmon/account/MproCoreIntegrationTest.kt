@@ -98,6 +98,7 @@ class MproCoreIntegrationTest {
         val pay = phone1.checkout("lifetime", phone = "+226 70 00 00 00") as MproCore.Checkout.Pay
         assertEquals(5000L, pay.amount)
         assertEquals("l’accès à vie", phone1.account!!.pending)
+        assertEquals("lifetime", phone1.account!!.pendingItem)
         val sale = pay.url.substringAfterLast('/')
         val ctl = URL("$base/control/pay?sale=$sale").openConnection() as HttpURLConnection
         ctl.requestMethod = "POST"; assertEquals(200, ctl.responseCode)
@@ -106,11 +107,23 @@ class MproCoreIntegrationTest {
         assertEquals("lifetime", after.status)
         assertEquals(1000L, after.balance)
         assertNull(after.pending)
+        assertNull(after.pendingItem)
 
         // Modèle premium payé avec le reste du solde, sans page de paiement.
         assertTrue(phone1.checkout("tpl-neon-cyan", "Néon Cyan") is MproCore.Checkout.Done)
         assertTrue("tpl-neon-cyan" in phone1.account!!.items)
         assertEquals(0L, phone1.account!!.balance)
+
+        // Un paiement en attente n'empêche pas d'en lancer un autre (autre modèle, accès à distance) : le serveur
+        // remplace l'attente, et l'application garde le bouton de paiement partout.
+        val tpl = phone1.checkout("tpl-aurore", "Aurore") as MproCore.Checkout.Pay
+        assertTrue(tpl.url.isNotBlank())
+        assertEquals("tpl-aurore", phone1.account!!.pendingItem)
+        val remote = phone1.checkout("distance-20261117", "Accès à distance · 2 mois") as MproCore.Checkout.Pay
+        assertEquals(1000L, remote.price)
+        assertEquals("distance-20261117", phone1.account!!.pendingItem)
+        phone1.cancelPending()
+        assertNull(phone1.account!!.pendingItem)
 
         // Nouveau téléphone : la boutique reconnaît le navigateur et renvoie directement vers l'application.
         val phone2 = MproCore("mikhmon-droid", "mikhmondroid", "0.3.0", listOf(base), MemPrefs(), device = "Itel A70")

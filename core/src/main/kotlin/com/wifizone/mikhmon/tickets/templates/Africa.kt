@@ -51,13 +51,13 @@ class AfricaTemplate(id: String, name: String, palette: Palette, private val mot
         val pass = t.v.password
         val lab = Kit.style(FontFace.BOLD, 7f, 0.25f)
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), x0, 72f, lab, p.muted)
-            Kit.text(c, t.v.username, x0, 104f, Kit.style(FontFace.MONO_HEAVY, 28f, 0.05f), p.text, maxW = cw)
+            Kit.text(c, Kit.codeLabel(t), x0, 72f - Kit.codeLift(t, 28f), lab, p.muted)
+            Kit.codeText(t, t.v.username, x0, 104f, 28f, 0.05f, p.text, maxW = cw)
         } else {
-            Kit.text(c, "UTILISATEUR", x0, 68f, lab, p.muted)
-            Kit.text(c, t.v.username, x0, 88f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.text, maxW = cw)
+            Kit.text(c, "UTILISATEUR", x0, 68f - Kit.codeLift(t, 17f), lab, p.muted)
+            Kit.codeText(t, t.v.username, x0, 88f, 17f, 0.04f, p.text, maxW = cw)
             Kit.text(c, "MOT DE PASSE", x0, 104f, lab, p.muted)
-            Kit.text(c, pass, x0, 124f, Kit.style(FontFace.MONO_HEAVY, 17f, 0.04f), p.primary, maxW = cw)
+            Kit.codeText(t, pass, x0, 124f, 17f, 0.04f, p.primary, maxW = cw)
         }
         Kit.chips(c, Kit.infos(t), x0 - 2f, 150f, mw + 4f, 19f, Kit.style(FontFace.SEMIBOLD, 8.6f),
             Colors.alpha(p.primary, 0.12f), p.text, p.primary, icons = t.o.showIcons)

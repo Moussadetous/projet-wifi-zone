@@ -48,15 +48,15 @@ class NeonTemplate(id: String, name: String, palette: Palette) :
         val label = Kit.style(FontFace.BOLD, 7f, 0.25f)
         val white = Colors.WHITE
         if (pass == null) {
-            Kit.text(c, Kit.codeLabel(t), 26f, 82f, label, Colors.alpha(white, 0.55f))
-            val st = Kit.text(c, t.v.username, 26f, 112f, Kit.style(FontFace.MONO_HEAVY, 28f, 0.08f), white, maxW = codeW)
+            Kit.text(c, Kit.codeLabel(t), 26f, 82f - Kit.codeLift(t, 28f), label, Colors.alpha(white, 0.55f))
+            val st = Kit.codeText(t, t.v.username, 26f, 112f, 28f, 0.08f, white, maxW = codeW)
             val tw = c.measure(t.v.username, st)
             Kit.glow(c, VPath().moveTo(26f, 121f).lineTo(26f + tw, 121f), p.accent, 1.4f, 2.5f)
         } else {
-            Kit.text(c, "UTILISATEUR", 26f, 80f, label, Colors.alpha(white, 0.55f))
-            Kit.text(c, t.v.username, 26f, 102f, Kit.style(FontFace.MONO_HEAVY, 19f, 0.05f), white, maxW = codeW)
+            Kit.text(c, "UTILISATEUR", 26f, 80f - Kit.codeLift(t, 17f), label, Colors.alpha(white, 0.55f))
+            Kit.codeText(t, t.v.username, 26f, 102f, 19f, 0.05f, white, maxW = codeW)
             Kit.text(c, "MOT DE PASSE", 26f, 118f, label, Colors.alpha(white, 0.55f))
-            Kit.text(c, pass, 26f, 138f, Kit.style(FontFace.MONO_HEAVY, 19f, 0.05f), Colors.lighten(p.accent, 0.4f), maxW = codeW)
+            Kit.codeText(t, pass, 26f, 138f, 19f, 0.05f, Colors.lighten(p.accent, 0.4f), maxW = codeW)
         }
         Kit.chips(c, Kit.infos(t), 24f, 146f, codeW + 6f, 18f, Kit.style(FontFace.SEMIBOLD, 8.2f),
             Colors.alpha(p.primary, 0.16f), white, Colors.lighten(p.primary, 0.3f), icons = t.o.showIcons)
