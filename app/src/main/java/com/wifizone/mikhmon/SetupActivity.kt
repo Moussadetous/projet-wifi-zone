@@ -23,8 +23,8 @@ class SetupActivity : AppCompatActivity() {
         fields[key] = e; box.addView(e)
     }
 
-    override fun onCreate(b: Bundle?) {
-        super.onCreate(b)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
         val old = SettingsStore(this).load()
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(48, 48, 48, 48) }
         box.addView(TextView(this).apply { text = "Configuration Mikhmon"; textSize = 22f })

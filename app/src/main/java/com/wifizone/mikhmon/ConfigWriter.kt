@@ -12,8 +12,8 @@ object ConfigWriter {
 
     /** Équivalent exact de la fonction encrypt() de Mikhmon v3. */
     fun encrypt(s: String): String {
-        val out = ByteArray(s.length)
         val bytes = s.toByteArray(Charsets.UTF_8)
+        val out = ByteArray(bytes.size)
         for (i in bytes.indices) {
             // PHP: substr($key, ($i % strlen($key)) - 1, 1) ; index négatif = depuis la fin
             var idx = (i % KEY.length) - 1
