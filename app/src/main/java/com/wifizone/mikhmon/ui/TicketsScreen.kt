@@ -3,7 +3,6 @@
 package com.wifizone.mikhmon.ui
 
 import android.app.Activity
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,10 +45,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.wifizone.mikhmon.Defaults
 import com.wifizone.mikhmon.Services
 import com.wifizone.mikhmon.router.HsUser
 import com.wifizone.mikhmon.router.Profile
+import com.wifizone.mikhmon.tickets.Catalog
 import com.wifizone.mikhmon.tickets.Vouchers
 import com.wifizone.mikhmon.tickets.gfx.Icons
 import kotlinx.coroutines.launch
@@ -61,11 +60,7 @@ data class Batch(val comment: String, val users: List<HsUser>) {
     val note get() = parts.drop(3).joinToString("-").trim()
     val used get() = users.count { it.used }
     val profile get() = users.groupingBy { it.profile }.eachCount().maxByOrNull { it.value }?.key.orEmpty()
-}
-
-fun mikhmonPrintPath(comment: String, qr: Boolean): String {
-    val session = Defaults.sessionName(Services.settings.load()?.sessionName ?: "")
-    return "/voucher/print.php?id=${Uri.encode(comment)}&qr=${if (qr) "yes" else "no"}&session=${Uri.encode(session)}"
+    val title get() = note.ifBlank { if (date.isNotBlank()) "Lot du $date" else comment }
 }
 
 @Composable
@@ -112,14 +107,15 @@ fun TicketsScreen(activity: Activity, nav: Nav) {
         Text("Tickets", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ActionCard("Studio premium", "46 modèles, PDF", Icons.SPARKLE, Brand.Premium, Modifier.weight(1f)) {
+            ActionCard("Imprimer en premium", "${Catalog.premium.size} modèles, aperçu, PDF", Icons.SPARKLE, Brand.Premium, Modifier.weight(1f)) {
                 val b = created ?: batches(users?.getOrNull()).firstOrNull()
-                if (b != null) nav.open(Overlay.Studio(b.note.ifBlank { "Lot du ${b.date}" }, b.users))
+                if (b != null) nav.open(Overlay.Studio(b.title, comment = b.comment, templateId = "premium"))
                 else Toast.makeText(activity, "Générez d'abord des tickets (ci-dessous).", Toast.LENGTH_LONG).show()
             }
-            ActionCard("Mikhmon standard", "Impression d'origine", Icons.TICKET, androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF475569), Color(0xFF1E293B))), Modifier.weight(1f)) {
+            ActionCard("Formats Mikhmon", "Default, QR, Small · gratuits", Icons.PRINT, androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFF475569), Color(0xFF1E293B))), Modifier.weight(1f)) {
                 val b = created ?: batches(users?.getOrNull()).firstOrNull()
-                if (b != null) nav.open(Overlay.MikhmonUrl(mikhmonPrintPath(b.comment, qr = true))) else nav.tab = Tab.MIKHMON
+                if (b != null) nav.open(Overlay.Studio(b.title, comment = b.comment, templateId = "mk-default"))
+                else Toast.makeText(activity, "Générez d'abord des tickets (ci-dessous).", Toast.LENGTH_LONG).show()
             }
         }
 
@@ -135,14 +131,16 @@ fun TicketsScreen(activity: Activity, nav: Nav) {
                     }
                 }
                 Spacer(Modifier.height(12.dp))
-                BigButton("Imprimer en premium", brush = Brand.Premium, icon = Icons.SPARKLE) { nav.open(Overlay.Studio(b.note.ifBlank { "Nouveau lot" }, b.users)) }
+                BigButton("Imprimer en premium", brush = Brand.Premium, icon = Icons.SPARKLE) { nav.open(Overlay.Studio(b.title, users = b.users, templateId = "premium")) }
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton({ nav.open(Overlay.MikhmonUrl(mikhmonPrintPath(b.comment, qr = false))) }, Modifier.weight(1f)) { Text("Mikhmon standard") }
-                    OutlinedButton({ nav.open(Overlay.MikhmonUrl(mikhmonPrintPath(b.comment, qr = true))) }, Modifier.weight(1f)) { Text("Mikhmon + QR") }
+                    OutlinedButton({ nav.open(Overlay.Studio(b.title, users = b.users, templateId = "mk-default")) }, Modifier.weight(1f)) { Text("Mikhmon Default") }
+                    OutlinedButton({ nav.open(Overlay.Studio(b.title, users = b.users, templateId = "mk-qr")) }, Modifier.weight(1f)) { Text("Mikhmon QR") }
                 }
             }
         }
+
+        ProfileStock(profiles?.getOrNull(), users, nav)
 
         SectionTitle("Générer des tickets")
         Panel(Modifier.fillMaxWidth()) {
@@ -208,26 +206,77 @@ fun TicketsScreen(activity: Activity, nav: Nav) {
                     IconBadge(Icons.TICKET, Brand.Indigo, 40.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(b.note.ifBlank { "Lot du ${b.date}" }, fontWeight = FontWeight.Bold)
+                        Text(b.title, fontWeight = FontWeight.Bold)
                         Text("${b.users.size} tickets · ${b.used} utilisé(s) · ${b.profile} · ${b.date}", color = Brand.Muted, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Brand.Premium).clickable { nav.open(Overlay.Studio(b.note.ifBlank { "Lot du ${b.date}" }, b.users)) }.padding(10.dp), contentAlignment = Alignment.Center) {
-                        Text("Premium ✦", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    OutlinedButton({ nav.open(Overlay.MikhmonUrl(mikhmonPrintPath(b.comment, qr = true))) }, Modifier.weight(1f)) { Text("Standard") }
-                }
+                PrintButtons(
+                    premium = { nav.open(Overlay.Studio(b.title, comment = b.comment, templateId = "premium")) },
+                    mikhmon = { nav.open(Overlay.Studio(b.title, comment = b.comment, templateId = "mk-default")) },
+                )
             }
         }
         Spacer(Modifier.height(20.dp))
     }
 }
 
+/** Lots Mikhmon, du plus récent au plus ancien (date du commentaire, puis ordre de création sur le routeur). */
 fun batches(users: List<HsUser>?): List<Batch> =
     users.orEmpty().filter { it.batch.isNotEmpty() }.groupBy { it.batch }.map { Batch(it.key, it.value) }
-        .sortedByDescending { b -> b.comment.split("-").getOrNull(2)?.split(".")?.let { "${it.getOrNull(2)}${it.getOrNull(0)}${it.getOrNull(1)}" } ?: "" }
+        .sortedWith(compareByDescending<Batch> { b -> b.comment.split("-").getOrNull(2)?.split(".")?.let { "${it.getOrNull(2)}${it.getOrNull(0)}${it.getOrNull(1)}" } ?: "" }
+            .thenByDescending { b -> b.users.maxOfOrNull { it.id.removePrefix("*").toLongOrNull(16) ?: 0L } ?: 0L })
+
+/**
+ * Stock de tickets par profil : combien il en reste à vendre (jamais utilisés) dans chaque profil, et impression de
+ * tout le profil d'un geste (aperçu, nombre de tickets par feuille, PDF).
+ */
+@Composable
+private fun ProfileStock(profiles: List<Profile>?, users: Result<List<HsUser>>?, nav: Nav) {
+    SectionTitle("Stock par profil")
+    val all = users?.getOrNull()
+    if (all == null) { if (users?.isFailure == true) ErrorNote("Tickets indisponibles : ${users?.exceptionOrNull()?.message}") else Loading(); return }
+    val groups = all.groupBy { it.profile }
+    val order = profiles.orEmpty().map { it.name }.filter { it in groups } + groups.keys.filter { k -> profiles.orEmpty().none { it.name == k } }
+    if (order.isEmpty()) { Panel(Modifier.fillMaxWidth()) { Text("Aucun ticket sur le routeur pour l'instant.", color = Brand.Muted) }; return }
+    order.forEach { name ->
+        val list = groups[name].orEmpty()
+        val free = list.count { !it.used }
+        val p = profiles?.firstOrNull { it.name == name }
+        Panel(Modifier.fillMaxWidth().padding(bottom = 10.dp), padding = 14.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBadge(Icons.KEY, Brand.Violet, 40.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(name.ifBlank { "(sans profil)" }, fontWeight = FontWeight.Bold)
+                    val info = listOfNotNull(p?.price?.let { Vouchers.price(it) + " F" }, Vouchers.duration(p?.validity)).joinToString(" · ")
+                    Text(listOf("${list.size} ticket(s)", info).filter { it.isNotBlank() }.joinToString(" · "), color = Brand.Muted, style = MaterialTheme.typography.bodySmall)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("$free", fontSize = 22.sp, fontWeight = FontWeight.Black, color = if (free > 0) Brand.Green else Brand.Muted)
+                    Text("à vendre", color = Brand.Muted, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            LinearProgressIndicator(progress = { if (list.isEmpty()) 0f else free / list.size.toFloat() }, color = Brand.Green, trackColor = Color(0xFFE6E9F0),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp).height(6.dp).clip(RoundedCornerShape(3.dp)))
+            PrintButtons(
+                premium = { nav.open(Overlay.Studio("Profil $name", profile = name, templateId = "premium", unusedOnly = free > 0)) },
+                mikhmon = { nav.open(Overlay.Studio("Profil $name", profile = name, templateId = "mk-default", unusedOnly = free > 0)) },
+                label = if (free > 0) "Imprimer $free ✦" else "Imprimer ✦",
+            )
+        }
+    }
+}
+
+@Composable
+private fun PrintButtons(premium: () -> Unit, mikhmon: () -> Unit, label: String = "Premium ✦") {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Brand.Premium).clickable(onClick = premium).padding(10.dp), contentAlignment = Alignment.Center) {
+            Text(label, color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        OutlinedButton(mikhmon, Modifier.weight(1f)) { Text("Format Mikhmon") }
+    }
+}
 
 @Composable
 private fun Stepper(label: String, onClick: () -> Unit) {

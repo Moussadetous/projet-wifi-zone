@@ -22,6 +22,11 @@ class DesignStore(private val ctx: Context) {
         get() = prefs.getString("template", "std-standard") ?: "std-standard"
         set(v) { prefs.edit().putString("template", v).apply() }
 
+    /** Dernier modèle premium choisi (bouton « Premium » de Mikhmon). */
+    var lastPremium: String?
+        get() = prefs.getString("lastPremium", null)
+        set(v) { prefs.edit().putString("lastPremium", v).apply() }
+
     fun branding(defaultName: String, dns: String, currency: String): Branding {
         val j = prefs.getString("branding", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
         return Branding(
@@ -32,6 +37,12 @@ class DesignStore(private val ctx: Context) {
             currency = j?.optString("currency")?.ifBlank { null } ?: currency,
             logo = logo(),
         )
+    }
+
+    /** Remplace une devise enregistrée par erreur (ancienne déduction d'après la langue). */
+    fun replaceCurrency(old: String, new: String) {
+        val j = prefs.getString("branding", null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return
+        if (j.optString("currency").equals(old, ignoreCase = true)) prefs.edit().putString("branding", j.put("currency", new).toString()).apply()
     }
 
     fun saveBranding(b: Branding) {
@@ -66,12 +77,21 @@ class DesignStore(private val ctx: Context) {
         prefs.edit().putString("opt", j.toString()).apply()
     }
 
-    var print: PrintSettings
-        get() = PrintSettings(
+    /** Réglages du papier ; le nombre de tickets par feuille est gardé pour chaque modèle. */
+    fun print(templateId: String): PrintSettings {
+        val per = prefs.getString("perPage", null)?.let { runCatching { JSONObject(it) }.getOrNull() }
+        return PrintSettings(
             format = runCatching { PaperFormat.valueOf(prefs.getString("format", "A4")!!) }.getOrDefault(PaperFormat.A4),
-            columns = prefs.getInt("columns", 0), cutMarks = prefs.getBoolean("cuts", true),
+            perPage = per?.optInt(templateId, 0) ?: 0,
+            cutMarks = prefs.getBoolean("cuts", true),
         )
-        set(v) { prefs.edit().putString("format", v.format.name).putInt("columns", v.columns).putBoolean("cuts", v.cutMarks).apply() }
+    }
+
+    fun savePrint(templateId: String, v: PrintSettings) {
+        val per = prefs.getString("perPage", null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
+        per.put(templateId, v.perPage)
+        prefs.edit().putString("format", v.format.name).putBoolean("cuts", v.cutMarks).putString("perPage", per.toString()).apply()
+    }
 
     fun logo(): BitmapRef? = if (logoFile.exists()) BitmapFactory.decodeFile(logoFile.absolutePath)?.let { BitmapRef(it) } else null
 

@@ -38,11 +38,21 @@ object PdfExporter {
         return "tickets_${count}_${slug}_$d.pdf"
     }
 
-    fun build(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings): PdfDocument {
+    /** Pages à produire : toutes, ou celles choisies (indices à partir de 0). */
+    private fun pagesOf(plan: com.wifizone.mikhmon.tickets.SheetPlan, pages: Collection<Int>?): List<Int> =
+        pages?.filter { it in 0 until plan.pages }?.distinct()?.sorted()?.ifEmpty { null } ?: (0 until plan.pages).toList()
+
+    /** Nombre de tickets réellement imprimés sur les pages choisies. */
+    fun ticketCount(t: TicketTemplate, count: Int, s: PrintSettings, pages: Collection<Int>?): Int {
+        val plan = Sheet.plan(t, count, s)
+        return pagesOf(plan, pages).sumOf { plan.ticketsOn(it).count() }
+    }
+
+    fun build(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, pages: Collection<Int>? = null): PdfDocument {
         val plan = Sheet.plan(t, vouchers.size, s)
         val doc = PdfDocument()
-        for (page in 0 until plan.pages) {
-            val info = PdfDocument.PageInfo.Builder(plan.pageW.roundToInt(), plan.pageH.roundToInt(), page + 1).create()
+        for ((n, page) in pagesOf(plan, pages).withIndex()) {
+            val info = PdfDocument.PageInfo.Builder(plan.pageW.roundToInt(), plan.pageH.roundToInt(), n + 1).create()
             val p = doc.startPage(info)
             Sheet.drawPage(AndroidCanvas2D(p.canvas, ctx), plan, page, t, vouchers, b, o, s)
             doc.finishPage(p)
@@ -50,11 +60,11 @@ object PdfExporter {
         return doc
     }
 
-    suspend fun export(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings): Result =
+    suspend fun export(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, only: Collection<Int>? = null): Result =
         withContext(Dispatchers.IO) {
-            val doc = build(ctx, t, vouchers, b, o, s)
+            val doc = build(ctx, t, vouchers, b, o, s, only)
             val pages = doc.pages.size
-            val name = fileName(t, vouchers.size)
+            val name = fileName(t, ticketCount(t, vouchers.size, s, only))
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     val values = ContentValues().apply {
@@ -85,19 +95,67 @@ object PdfExporter {
             }
         }
 
-    /** Fichier PDF temporaire (tests et partage direct), dans le cache de l'application. */
-    suspend fun exportToCache(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings): File =
+    /** Fichier PDF temporaire (impression, tests), dans le cache de l'application. */
+    suspend fun exportToCache(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, only: Collection<Int>? = null): File =
         withContext(Dispatchers.IO) {
-            val doc = build(ctx, t, vouchers, b, o, s)
-            val file = File(ctx.cacheDir, fileName(t, vouchers.size))
+            val dir = File(ctx.cacheDir, "pdf").apply { mkdirs() }
+            dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 3_600_000L }?.forEach { it.delete() }
+            val doc = build(ctx, t, vouchers, b, o, s, only)
+            val file = File(dir, fileName(t, ticketCount(t, vouchers.size, s, only)))
             try { FileOutputStream(file).use { doc.writeTo(it) } } finally { doc.close() }
             file
         }
+
+    /**
+     * Impression par le système Android (comme Chrome) : imprimantes Wi-Fi ou Bluetooth installées,
+     * ou « Enregistrer au format PDF ». Le PDF est préparé d'abord, le système n'a plus qu'à l'envoyer.
+     */
+    suspend fun print(activity: android.app.Activity, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, only: Collection<Int>? = null) {
+        val file = exportToCache(activity, t, vouchers, b, o, s, only)
+        val plan = Sheet.plan(t, vouchers.size, s)
+        val count = pagesOf(plan, only).size
+        val media = when (s.format) {
+            com.wifizone.mikhmon.tickets.PaperFormat.A4 -> android.print.PrintAttributes.MediaSize.ISO_A4
+            com.wifizone.mikhmon.tickets.PaperFormat.A5 -> android.print.PrintAttributes.MediaSize.ISO_A5
+            com.wifizone.mikhmon.tickets.PaperFormat.LETTER -> android.print.PrintAttributes.MediaSize.NA_LETTER
+            else -> null
+        }
+        val attrs = android.print.PrintAttributes.Builder().apply { media?.let { setMediaSize(it) } }
+            .setColorMode(android.print.PrintAttributes.COLOR_MODE_COLOR).build()
+        val pm = activity.getSystemService(android.print.PrintManager::class.java)
+        pm.print(file.nameWithoutExtension, PdfFileAdapter(file, count), attrs)
+    }
+}
+
+/** Transmet un PDF déjà prêt au service d'impression d'Android. */
+private class PdfFileAdapter(private val file: File, private val pages: Int) : android.print.PrintDocumentAdapter() {
+    override fun onLayout(
+        oldAttributes: android.print.PrintAttributes?, newAttributes: android.print.PrintAttributes,
+        cancellationSignal: android.os.CancellationSignal?, callback: LayoutResultCallback, extras: android.os.Bundle?,
+    ) {
+        if (cancellationSignal?.isCanceled == true) { callback.onLayoutCancelled(); return }
+        val info = android.print.PrintDocumentInfo.Builder(file.name)
+            .setContentType(android.print.PrintDocumentInfo.CONTENT_TYPE_DOCUMENT).setPageCount(pages).build()
+        callback.onLayoutFinished(info, oldAttributes == null || oldAttributes != newAttributes)
+    }
+
+    override fun onWrite(
+        pages: Array<out android.print.PageRange>?, destination: android.os.ParcelFileDescriptor,
+        cancellationSignal: android.os.CancellationSignal?, callback: WriteResultCallback,
+    ) {
+        try {
+            file.inputStream().use { input -> java.io.FileOutputStream(destination.fileDescriptor).use { input.copyTo(it) } }
+            if (cancellationSignal?.isCanceled == true) callback.onWriteCancelled()
+            else callback.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+        } catch (e: Exception) {
+            callback.onWriteFailed(e.message)
+        }
+    }
 }
 
 /** Aperçus des tickets (images), avec un petit cache. */
 object Previews {
-    private val cache = object : android.util.LruCache<String, Bitmap>(24 * 1024 * 1024) {
+    private val cache = object : android.util.LruCache<String, Bitmap>(40 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
 
@@ -112,14 +170,18 @@ object Previews {
         return bmp
     }
 
-    fun page(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, widthPx: Int): Bitmap? {
+    /** Image d'une page entière (aperçu de la feuille telle qu'elle sera imprimée). */
+    fun page(ctx: Context, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings, widthPx: Int, page: Int = 0, key: String? = null): Bitmap? {
         if (vouchers.isEmpty()) return null
+        key?.let { k -> cache.get(k)?.let { return it } }
         val plan = Sheet.plan(t, vouchers.size, s)
+        if (page !in 0 until plan.pages) return null
         val scale = widthPx / plan.pageW
         val bmp = Bitmap.createBitmap(widthPx, (plan.pageH * scale).roundToInt().coerceAtLeast(8), Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
         c.scale(scale, scale)
-        Sheet.drawPage(AndroidCanvas2D(c, ctx), plan, 0, t, vouchers, b, o, s)
+        Sheet.drawPage(AndroidCanvas2D(c, ctx), plan, page, t, vouchers, b, o, s)
+        key?.let { cache.put(it, bmp) }
         return bmp
     }
 

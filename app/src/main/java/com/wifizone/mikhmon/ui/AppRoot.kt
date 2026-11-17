@@ -56,7 +56,22 @@ sealed interface Overlay {
     object Account : Overlay
     object Logs : Overlay
     object Setup : Overlay
-    data class Studio(val title: String, val users: List<HsUser>) : Overlay
+    /**
+     * Impression de tickets (générateur PDF avec aperçu). Les tickets sont donnés ([users]) ou lus sur le routeur :
+     * un lot Mikhmon ([comment]), un profil ([profile]) ou un seul ticket ([userName]).
+     * [templateId] : modèle présélectionné (« mk-default », « mk-qr », « mk-small » pour les boutons de Mikhmon,
+     * « premium » pour le dernier modèle premium utilisé). [unusedOnly] : null = comme Mikhmon (lots et profils :
+     * seulement les tickets jamais utilisés).
+     */
+    data class Studio(
+        val title: String,
+        val users: List<HsUser>? = null,
+        val comment: String? = null,
+        val profile: String? = null,
+        val userName: String? = null,
+        val templateId: String? = null,
+        val unusedOnly: Boolean? = null,
+    ) : Overlay
     data class MikhmonUrl(val path: String) : Overlay
 }
 
@@ -64,6 +79,8 @@ class Nav {
     var tab by mutableStateOf(Tab.HOME)
     var overlay by mutableStateOf<Overlay?>(null)
     var mikhmonPath by mutableStateOf<String?>(null)
+    /** Navigateur de Mikhmon gardé ouvert : on retrouve la même page en revenant de l'impression. */
+    val web = WebHolder()
     fun open(o: Overlay) { overlay = o }
     fun back(): Boolean {
         if (overlay != null) { overlay = null; return true }
@@ -123,7 +140,15 @@ fun AppRoot(activity: Activity) {
             "accueil" -> nav.tab = Tab.HOME
             "studio" -> scope.launch {
                 val b = runCatching { batches(Services.router.users()).firstOrNull() }.getOrNull()
-                if (b != null) nav.open(Overlay.Studio(b.note.ifBlank { "Lot du ${b.date}" }, b.users)) else nav.tab = Tab.TICKETS
+                if (b != null) nav.open(Overlay.Studio(b.title, comment = b.comment, templateId = "premium")) else nav.tab = Tab.TICKETS
+            }
+            else -> {
+                // « lot:<commentaire> », « profil:<nom> » (raccourcis internes et tests).
+                val o = open.orEmpty()
+                when {
+                    o.startsWith("lot:") -> nav.open(Overlay.Studio(o.removePrefix("lot:").let { Batch(it, emptyList()).title }, comment = o.removePrefix("lot:")))
+                    o.startsWith("profil:") -> nav.open(Overlay.Studio("Profil ${o.removePrefix("profil:")}", profile = o.removePrefix("profil:")))
+                }
             }
         }
         if (open != null) Services.openRequest.value = null

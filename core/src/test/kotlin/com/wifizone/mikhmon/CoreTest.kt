@@ -28,8 +28,17 @@ class CoreTest {
     }
 
     @Test fun defaults() {
-        assertEquals("FCFA", Defaults.currencyFor(Locale("fr", "SN")))
-        assertEquals("EUR", Defaults.currencyFor(Locale.FRANCE))
+        assertEquals("FCFA", Defaults.currencyFor(locale = Locale("fr", "SN")))
+        assertEquals("EUR", Defaults.currencyFor(locale = Locale.FRANCE))
+        // Téléphone en « Français (France) » au Niger, au Burkina, au Cameroun : le pays l'emporte sur la langue.
+        assertEquals("FCFA", Defaults.currencyFor("ne", Locale.FRANCE))
+        assertEquals("FCFA", Defaults.currencyFor("BF", Locale.FRANCE))
+        assertEquals("FCFA", Defaults.currencyFor("cm", Locale.US))
+        assertEquals("GNF", Defaults.currencyFor("GN", Locale.FRANCE))
+        assertEquals("NGN", Defaults.currencyFor("NG", Locale.FRANCE))
+        assertEquals("EUR", Defaults.currencyFor("", Locale.FRANCE))
+        assertEquals("NE", Defaults.countryFromTimeZone("Africa/Niamey"))
+        assertEquals(null, Defaults.countryFromTimeZone("Europe/Paris"))
         assertEquals("MikroTik", Defaults.sessionName("  "))
         assertEquals("Hotspot-Zone_1", Defaults.sessionName("Hotspot Zone_1"))
         assertEquals("192.168.88.1", Defaults.guessGateway("192.168.88.254"))

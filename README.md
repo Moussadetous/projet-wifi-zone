@@ -15,11 +15,15 @@ Mikhmon v3 tout-en-un sur Android, sans Termux, avec un tableau de contrôle nat
 - **Trafic** : courbe en direct par interface, plus gros consommateurs.
 - **Journal** : connexions, échecs, système, ventes Mikhmon du jour et du mois.
 - **Tickets** : génération en quelques touches, au format Mikhmon (lots `vc-…`/`up-…`, profils, prix, validité) ;
-  impression **Mikhmon standard** ou **Studio premium**.
-- **Studio premium** : 46 modèles (dont 2 gratuits), couleurs, textes, motif ou logo, QR de connexion automatique,
-  icônes, papier A4 / A5 / Lettre / rouleaux 58 et 80 mm, **export PDF natif** dans Téléchargements/Mikhmon.
-  Chaque modèle premium s'achète une fois (prix réglé sur la boutique).
-- **Mikhmon** : l'interface d'origine complète, déjà connectée.
+  **stock par profil** (tickets restant à vendre) et impression d'un lot ou de tout un profil.
+- **Impression des tickets** : formats **Mikhmon Default, QR et Small** (gratuits), Standard et Mini (gratuits) et
+  46 modèles premium ; **nombre de tickets par feuille au choix** (taille réelle, 8, 24, 100…, la grille s'adapte),
+  **aperçu de chaque page**, choix des pages, **impression Android** (imprimantes, « Enregistrer en PDF ») ou
+  **PDF natif** dans Téléchargements/Mikhmon. Couleurs, textes, motif ou logo, QR de connexion automatique,
+  papier A4 / A5 / Lettre / rouleaux 58 et 80 mm. Chaque modèle premium s'achète une fois (prix réglé sur la boutique).
+- **Mikhmon** : l'interface d'origine complète, déjà connectée. Ses boutons d'impression (Default, QR, Small, tickets
+  à l'unité, après « Générer ») ouvrent l'impression de l'application avec aperçu ; un bouton **Premium** y est ajouté.
+- **Devise** : déduite du pays du téléphone (réseau, carte SIM, fuseau horaire), FCFA dans la zone UEMOA/CEMAC.
 - Raccourcis sur l'icône (appui long) : générer des tickets, clients, trafic, journal.
 
 ## Comment ça marche

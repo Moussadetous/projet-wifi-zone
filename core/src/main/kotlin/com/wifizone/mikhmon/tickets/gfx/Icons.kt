@@ -126,6 +126,18 @@ object Icons {
     val DOWNLOAD = Icon("download", "Téléchargement", VPath()
         .polygon(10.5f, 3f, 13.5f, 3f, 13.5f, 10.5f, 17.2f, 10.5f, 12f, 16.4f, 6.8f, 10.5f, 10.5f, 10.5f)
         .polygon(3f, 14.5f, 5.2f, 14.5f, 5.2f, 18.8f, 18.8f, 18.8f, 18.8f, 14.5f, 21f, 14.5f, 21f, 21f, 3f, 21f))
+    val PRINT = Icon("print", "Imprimer", VPath().apply {
+        evenOdd = true
+        rect(6.6f, 2.6f, 10.8f, 4.2f)          // feuille qui entre
+        roundRect(2f, 8f, 20f, 8.6f, 2.2f)      // corps de l'imprimante
+        rect(6.6f, 12.6f, 10.8f, 1.5f)          // fente (évidée)
+        circle(18.2f, 10.8f, 1f)                // voyant (évidé)
+        rect(6.6f, 17.8f, 10.8f, 3.8f)          // feuille imprimée
+    })
+    val GRID = Icon("grid", "Grille", VPath()
+        .roundRect(3f, 3f, 5f, 5f, 1.2f).roundRect(9.5f, 3f, 5f, 5f, 1.2f).roundRect(16f, 3f, 5f, 5f, 1.2f)
+        .roundRect(3f, 9.5f, 5f, 5f, 1.2f).roundRect(9.5f, 9.5f, 5f, 5f, 1.2f).roundRect(16f, 9.5f, 5f, 5f, 1.2f)
+        .roundRect(3f, 16f, 5f, 5f, 1.2f).roundRect(9.5f, 16f, 5f, 5f, 1.2f).roundRect(16f, 16f, 5f, 5f, 1.2f))
     val PLAY = Icon("play", "Vidéo", VPath().apply {
         evenOdd = true
         circle(12f, 12f, 10f); polygon(9.8f, 7.6f, 16.8f, 12f, 9.8f, 16.4f)
@@ -156,7 +168,7 @@ object Icons {
 
     /** Icônes proposées pour le motif principal des tickets. */
     val ALL = listOf(WIFI, CLOCK, HOURGLASS, CALENDAR, DATA, GAUGE, BOLT, INFINITY, USER, KEY, LOCK, PHONE, CHAT, GLOBE,
-        STAR, CROWN, TICKET, SIGNAL, HEART, PLANE, SCISSORS, SHIELD, DOWNLOAD, PLAY, COFFEE, HOME, FLAME, GIFT, SPARKLE, CHECK)
+        STAR, CROWN, TICKET, SIGNAL, HEART, PLANE, SCISSORS, SHIELD, DOWNLOAD, PRINT, GRID, PLAY, COFFEE, HOME, FLAME, GIFT, SPARKLE, CHECK)
     val MOTIFS = listOf(WIFI, BOLT, STAR, CROWN, FLAME, HEART, GLOBE, SIGNAL, COFFEE, HOME, GIFT, SPARKLE, PLAY, SHIELD, PLANE, TICKET)
 
     fun byId(id: String?) = ALL.firstOrNull { it.id == id }

@@ -246,7 +246,7 @@ private fun UserSheet(u: HsUser, nav: Nav, onClose: () -> Unit, onChanged: () ->
             Field("Limite de données", u.limitBytes.toLongOrNull()?.let { Fmt.bytes(it) } ?: "aucune")
             Field("Commentaire", u.comment)
             Spacer(Modifier.height(16.dp))
-            BigButton("Imprimer ce ticket (premium)", brush = Brand.Premium, icon = Icons.SPARKLE) { onClose(); nav.open(Overlay.Studio("Ticket ${u.name}", listOf(u))) }
+            BigButton("Imprimer ce ticket (premium)", brush = Brand.Premium, icon = Icons.SPARKLE) { onClose(); nav.open(Overlay.Studio("Ticket ${u.name}", users = listOf(u), templateId = "premium")) }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton({ act(if (u.disabled) "Ticket réactivé" else "Ticket désactivé") { Services.router.setDisabled(u.id, !u.disabled) } }, Modifier.weight(1f)) {

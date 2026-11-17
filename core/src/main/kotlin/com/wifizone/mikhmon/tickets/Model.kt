@@ -92,7 +92,7 @@ class TicketContext(
 )
 
 enum class Category(val label: String) {
-    CLASSIC("Classiques"), BOLD("Audacieux"), ELEGANT("Élégants"), AFRICA("Motifs africains"), FUN("Festifs"), THERMAL("Thermique")
+    MIKHMON("Formats Mikhmon"), CLASSIC("Classiques"), BOLD("Audacieux"), ELEGANT("Élégants"), AFRICA("Motifs africains"), FUN("Festifs"), THERMAL("Thermique")
 }
 
 /** Un modèle de ticket. Il dessine dans un repère fixe [w] × [h] (mis à l'échelle à l'impression). */

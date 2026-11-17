@@ -66,6 +66,47 @@ class SheetAndVoucherTest {
         org.junit.Assert.assertEquals(3, roll.pages)
     }
 
+    /** Nombre de tickets par feuille choisi : la grille tient dans la page, exactement N tickets par page. */
+    @Test fun densePerPage() {
+        for (tpl in Catalog.all) for (n in listOf(1, 8, 24, 50, 100, 120)) {
+            val count = 250
+            val st = PrintSettings(PaperFormat.A4, perPage = n)
+            val plan = Sheet.plan(tpl, count, st)
+            org.junit.Assert.assertEquals("${tpl.id} $n", (count + n - 1) / n, plan.pages)
+            org.junit.Assert.assertEquals(n, plan.perPage)
+            org.junit.Assert.assertTrue(plan.columns * plan.rows >= n)
+            for (p in 0 until plan.pages) org.junit.Assert.assertTrue(plan.ticketsOn(p).count() <= n)
+            for (sl in plan.slots) {
+                org.junit.Assert.assertTrue("${tpl.id} $n", sl.x >= 0 && sl.x + sl.w <= plan.pageW + 0.01f)
+                org.junit.Assert.assertTrue("${tpl.id} $n", sl.y >= 0 && sl.y + sl.h <= plan.pageH + 0.01f)
+                org.junit.Assert.assertEquals(tpl.aspect, sl.w / sl.h, 0.01f)
+            }
+            // Pas de chevauchement dans une page.
+            val first = plan.slots.filter { it.page == 0 }
+            for (i in first.indices) for (j in i + 1 until first.size) {
+                val a = first[i]; val b = first[j]
+                org.junit.Assert.assertFalse("${tpl.id} $n", a.x < b.x + b.w - 0.01f && b.x < a.x + a.w - 0.01f && a.y < b.y + b.h - 0.01f && b.y < a.y + a.h - 0.01f)
+            }
+        }
+        // 100 tickets « Mikhmon Small » sur une seule feuille A4, encore lisibles (plus de 2,5 cm de large).
+        val small = Sheet.plan(Catalog.byId("mk-small")!!, 100, PrintSettings(PaperFormat.A4, perPage = 100))
+        org.junit.Assert.assertEquals(1, small.pages)
+        org.junit.Assert.assertTrue(Sheet.sizeLabel(small), small.ticketWmm > 25f)
+        // Peu de tickets par page : ils sont agrandis pour remplir la feuille.
+        val big = Sheet.plan(Catalog.byId("tpl-carte-or")!!, 4, PrintSettings(PaperFormat.A4, perPage = 4))
+        org.junit.Assert.assertTrue(big.ticketWmm > 95f)
+    }
+
+    @Test fun pageSelection() {
+        org.junit.Assert.assertEquals(listOf(0, 1, 2, 4), Sheet.parsePages("1-3, 5", 6))
+        org.junit.Assert.assertEquals(listOf(3, 4, 5), Sheet.parsePages("4-", 6))
+        org.junit.Assert.assertEquals(listOf(1), Sheet.parsePages("2 ; 9", 6))
+        org.junit.Assert.assertEquals(null, Sheet.parsePages("abc", 6))
+        org.junit.Assert.assertEquals(null, Sheet.parsePages("", 6))
+        org.junit.Assert.assertEquals("1-3, 5", Sheet.formatPages(listOf(4, 0, 2, 1)))
+        org.junit.Assert.assertEquals("2", Sheet.formatPages(listOf(1)))
+    }
+
     @Test fun generatedCodesAreUniqueAndUnambiguous() {
         val existing = setOf("AAAA")
         val list = Vouchers.generate(Vouchers.Spec(300, length = 5), existing)
@@ -100,10 +141,12 @@ class SheetPreviewTest {
     @Test fun a4Page() {
         val out = System.getenv("PREVIEW_DIR")?.let { File(it) } ?: return
         val brand = Branding("Wifi Zone Ouaga", "", "wifi.zone", "+226 70 12 34 56", "F")
-        for (id in listOf("tpl-carte-saphir", "std-mini", "tpl-billet-rouge")) {
+        val pages = listOf("tpl-carte-saphir" to 0, "std-mini" to 0, "tpl-billet-rouge" to 0, "mk-default" to 0, "mk-qr" to 0, "mk-small" to 0,
+            "mk-small" to 100, "mk-qr" to 40, "tpl-aurore" to 24)
+        for ((id, per) in pages) {
             val tpl = Catalog.byId(id)!!
-            val vs = Vouchers.generate(Vouchers.Spec(80), emptySet()).mapIndexed { i, (u, p) -> Voucher(u, p, "", "500", "24 h", "2 Go", null, serial = i + 1) }
-            val st = PrintSettings(PaperFormat.A4)
+            val vs = Vouchers.generate(Vouchers.Spec(120), emptySet()).mapIndexed { i, (u, p) -> Voucher(u, p, "", "500", "24 h", "2 Go", null, serial = i + 1) }
+            val st = PrintSettings(PaperFormat.A4, perPage = per)
             val plan = Sheet.plan(tpl, vs.size, st)
             val scale = 1.4f
             val img = BufferedImage((plan.pageW * scale).toInt(), (plan.pageH * scale).toInt(), BufferedImage.TYPE_INT_RGB)
@@ -114,7 +157,7 @@ class SheetPreviewTest {
             c.scale(scale)
             Sheet.drawPage(c, plan, 0, tpl, vs, brand, TicketOptions(), st)
             g.dispose()
-            ImageIO.write(img, "png", File(out, "page-a4-$id.png"))
+            ImageIO.write(img, "png", File(out, "page-a4-$id${if (per > 0) "-$per" else ""}.png"))
             println("$id : " + Sheet.summary(plan, vs.size))
         }
     }

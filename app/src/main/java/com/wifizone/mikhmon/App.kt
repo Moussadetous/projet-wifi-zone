@@ -12,6 +12,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Services.init(this)
+        runCatching { Region.migrateCurrency(this) }
     }
 }
 

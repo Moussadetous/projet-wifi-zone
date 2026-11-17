@@ -20,9 +20,14 @@ enum class PaperFormat(val label: String, val wMm: Float, val hMm: Float, val ro
 
 data class PrintSettings(
     val format: PaperFormat = PaperFormat.A4,
-    /** Tickets par ligne (feuilles) ; 0 = automatique. */
+    /**
+     * Tickets par feuille, choisis par l'utilisateur (8, 24, 100…) : la grille est calculée pour que les tickets
+     * soient aussi grands que possible. 0 = automatique (taille réelle du modèle).
+     */
+    val perPage: Int = 0,
+    /** Tickets par ligne imposés (feuilles) ; 0 = calculé. */
     val columns: Int = 0,
-    val marginMm: Float = 7f,
+    val marginMm: Float = 6f,
     val gapMm: Float = 3f,
     val cutMarks: Boolean = true,
 )
@@ -30,8 +35,19 @@ data class PrintSettings(
 /** Emplacement d'un ticket, en points PDF (1/72 de pouce). */
 data class Slot(val page: Int, val x: Float, val y: Float, val w: Float, val h: Float)
 
-class SheetPlan(val pageW: Float, val pageH: Float, val pages: Int, val slots: List<Slot>, val columns: Int, val rows: Int) {
-    val perPage get() = if (pages == 0) 0 else columns * rows
+class SheetPlan(
+    val pageW: Float, val pageH: Float, val pages: Int, val slots: List<Slot>, val columns: Int, val rows: Int,
+    /** Tickets par page (au plus columns × rows). */
+    val perPage: Int = columns * rows,
+) {
+    /** Taille d'un ticket imprimé, en millimètres. */
+    val ticketWmm get() = (slots.firstOrNull()?.w ?: 0f) / Sheet.PT_PER_MM
+    val ticketHmm get() = (slots.firstOrNull()?.h ?: 0f) / Sheet.PT_PER_MM
+    /** Indices des tickets de la page [page]. */
+    fun ticketsOn(page: Int): IntRange {
+        val from = page * perPage
+        return from until minOf(slots.size, from + perPage)
+    }
 }
 
 object Sheet {
@@ -61,6 +77,7 @@ object Sheet {
         val pageW = s.format.wMm * pt
         val pageH = s.format.hMm * pt
         val m = s.marginMm * pt
+        if (s.perPage > 0) return dense(t, count, s, pageW, pageH, m)
         val g = s.gapMm * pt
         val cols = (if (s.columns > 0) s.columns else autoColumns(t, s)).coerceIn(1, 8)
         // Jamais plus grand que la taille réelle du modèle (ex. carte bancaire 85,6 mm) : plus de tickets par page.
@@ -83,6 +100,58 @@ object Sheet {
         return SheetPlan(pageW, pageH, pages, slots, cols, rows)
     }
 
+    /** Espace entre les tickets : plus la feuille est chargée, plus il est fin (mais jamais nul, pour la découpe). */
+    fun gapFor(perPage: Int, wanted: Float): Float = minOf(wanted, when {
+        perPage <= 12 -> 3f
+        perPage <= 30 -> 2f
+        perPage <= 60 -> 1.5f
+        else -> 1f
+    })
+
+    /**
+     * Grille pour [n] tickets par page dans une zone [w] × [h] : le nombre de colonnes qui donne les plus grands
+     * tickets (à égalité, celui qui laisse le moins de cases vides). Renvoie colonnes, lignes et largeur d'un ticket.
+     */
+    fun bestGrid(n: Int, w: Float, h: Float, aspect: Float, gap: Float, fixedColumns: Int = 0): Triple<Int, Int, Float> {
+        var best: Triple<Int, Int, Float>? = null
+        val range = if (fixedColumns > 0) fixedColumns..fixedColumns else 1..n.coerceAtMost(40)
+        for (c in range) {
+            val r = (n + c - 1) / c
+            val tw = minOf((w - (c - 1) * gap) / c, (h - (r - 1) * gap) / r * aspect)
+            if (tw <= 0f) continue
+            val b = best
+            if (b == null || tw > b.third * 1.0001f || (tw > b.third * 0.9999f && c * r - n < b.first * b.second - n)) best = Triple(c, r, tw)
+        }
+        return best ?: Triple(1, n, 1f)
+    }
+
+    /** Feuille au nombre de tickets choisi : la grille s'adapte, les tickets sont mis à l'échelle pour tenir. */
+    private fun dense(t: TicketTemplate, count: Int, s: PrintSettings, pageW: Float, pageH: Float, m: Float): SheetPlan {
+        val pt = PT_PER_MM
+        val n = s.perPage.coerceIn(1, 400)
+        val g = gapFor(n, s.gapMm) * pt
+        val (cols, rows, tw) = bestGrid(n, pageW - 2 * m, pageH - 2 * m, t.aspect, g, s.columns)
+        val th = tw / t.aspect
+        val blockW = cols * tw + (cols - 1) * g
+        val blockH = rows * th + (rows - 1) * g
+        val left = (pageW - blockW) / 2f
+        val top = (pageH - blockH) / 2f
+        val pages = if (count == 0) 0 else (count + n - 1) / n
+        val slots = (0 until count).map { i ->
+            val k = i % n
+            val r = k / cols; val col = k % cols
+            Slot(i / n, left + col * (tw + g), top + r * (th + g), tw, th)
+        }
+        return SheetPlan(pageW, pageH, pages, slots, cols, rows, n)
+    }
+
+    /** Tickets par page à taille réelle (choix « Auto »). */
+    fun naturalPerPage(t: TicketTemplate, s: PrintSettings): Int = plan(t, 1, s.copy(perPage = 0)).let { it.columns * it.rows }
+
+    /** Choix proposés à l'utilisateur pour le nombre de tickets par feuille. */
+    fun densityChoices(t: TicketTemplate, s: PrintSettings): List<Int> =
+        (listOf(4, 6, 8, 10, 12, 16, 20, 24, 30, 40, 50, 60, 80, 100, 120, 150) + naturalPerPage(t, s)).distinct().sorted()
+
     /** Lien de connexion automatique au hotspot (comme les QR codes de Mikhmon). */
     fun loginUrl(dns: String, v: Voucher): String? {
         val host = dns.trim().removePrefix("http://").removePrefix("https://").trimEnd('/')
@@ -104,7 +173,7 @@ object Sheet {
 
     /** Dessine une page entière : ses tickets et, si demandé, les traits de coupe. */
     fun drawPage(c: Canvas2D, plan: SheetPlan, page: Int, t: TicketTemplate, vouchers: List<Voucher>, b: Branding, o: TicketOptions, s: PrintSettings) {
-        val mine = plan.slots.withIndex().filter { it.value.page == page }
+        val mine = plan.ticketsOn(page).map { IndexedValue(it, plan.slots[it]) }
         c.fill(VPath.rect(0f, 0f, plan.pageW, plan.pageH), Solid(Colors.WHITE))
         for ((i, slot) in mine) drawTicket(c, t, vouchers[i], b, o, slot.x, slot.y, slot.w)
         if (s.cutMarks && !s.format.roll && mine.isNotEmpty()) {
@@ -125,6 +194,41 @@ object Sheet {
         if (plan.slots.isEmpty()) "Aucun ticket"
         else if (plan.columns == 1 && plan.rows == 1) "$count ticket(s), un par page"
         else "$count ticket(s) · ${plan.perPage} par page (${plan.columns} × ${plan.rows}) · ${plan.pages} page(s)"
+
+    /** Taille d'un ticket, ex. « 58 × 31 mm ». */
+    fun sizeLabel(plan: SheetPlan): String = "${plan.ticketWmm.roundToInt()} × ${plan.ticketHmm.roundToInt()} mm"
+
+    /**
+     * Lit une sélection de pages saisie par l'utilisateur (« 1-3, 5 ») ; pages numérotées à partir de 1.
+     * Renvoie des indices à partir de 0, triés, limités au document ; null si la saisie est vide ou invalide.
+     */
+    fun parsePages(text: String, pages: Int): List<Int>? {
+        val out = sortedSetOf<Int>()
+        val parts = text.split(',', ';', ' ').map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return null
+        for (p in parts) {
+            val r = p.split('-', '–', '—').map { it.trim() }
+            val a = r[0].toIntOrNull() ?: return null
+            val b = if (r.size > 1) (r[1].ifEmpty { "$pages" }).toIntOrNull() ?: return null else a
+            if (r.size > 2) return null
+            for (i in minOf(a, b)..maxOf(a, b)) if (i in 1..pages) out += i - 1
+        }
+        return out.toList().ifEmpty { null }
+    }
+
+    /** Écrit une sélection de pages (indices à partir de 0) sous forme lisible : « 1-3, 5 ». */
+    fun formatPages(sel: Collection<Int>): String {
+        val l = sel.distinct().sorted()
+        if (l.isEmpty()) return ""
+        val out = ArrayList<String>()
+        var start = l[0]; var prev = l[0]
+        for (i in l.drop(1) + Int.MIN_VALUE) {
+            if (i == prev + 1) { prev = i; continue }
+            out += if (start == prev) "${start + 1}" else "${start + 1}-${prev + 1}"
+            start = i; prev = i
+        }
+        return out.joinToString(", ")
+    }
 
     fun mmLabel(pt: Float) = "${(pt / PT_PER_MM).roundToInt()} mm"
 }

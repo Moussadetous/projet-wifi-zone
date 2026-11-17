@@ -55,6 +55,21 @@ class PdfTest {
         Unit
     }
 
+    /** 100 tickets par feuille, et seulement les pages choisies. */
+    @Test fun denseSheetsAndChosenPages(): Unit = runBlocking {
+        val many = Vouchers.generate(Vouchers.Spec(250), emptySet()).mapIndexed { i, (u, p) -> Voucher(u, p, "1jour", "500", "24 h", null, null, serial = i + 1) }
+        val t = Catalog.byId("mk-small")!!
+        val s = PrintSettings(PaperFormat.A4, perPage = 100)
+        val f = PdfExporter.exportToCache(ctx, t, many, brand, TicketOptions(), s)
+        PdfRenderer(ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)).use { assertEquals("250 tickets à 100 par feuille", 3, it.pageCount) }
+        val g = PdfExporter.exportToCache(ctx, t, many, brand, TicketOptions(), s, only = listOf(1, 2))
+        PdfRenderer(ParcelFileDescriptor.open(g, ParcelFileDescriptor.MODE_READ_ONLY)).use { assertEquals("pages 2 et 3 seulement", 2, it.pageCount) }
+        assertEquals(150, PdfExporter.ticketCount(t, many.size, s, listOf(1, 2)))
+        Log.i("PdfTest", "100 par feuille : ${f.length() / 1024} Ko pour 3 pages, ${g.length() / 1024} Ko pour 2 pages")
+        f.delete(); g.delete()
+        Unit
+    }
+
     @Test fun savedInDownloads(): Unit = runBlocking {
         val r = PdfExporter.export(ctx, Catalog.byId("std-standard")!!, vouchers.take(5), brand, TicketOptions(), PrintSettings())
         assertTrue(r.bytes > 1000)

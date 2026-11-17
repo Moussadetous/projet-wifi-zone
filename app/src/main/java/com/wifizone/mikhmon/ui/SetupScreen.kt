@@ -67,7 +67,7 @@ fun SetupScreen(onDone: () -> Unit, onCancel: (() -> Unit)? = null) {
     var ip by remember { mutableStateOf(old?.routerIp ?: "") }
     var ipEdited by remember { mutableStateOf(old != null) }
     var port by remember { mutableStateOf((old?.routerPort ?: RouterOs.PORT).toString()) }
-    var currency by remember { mutableStateOf(old?.currency ?: Defaults.currencyFor()) }
+    var currency by remember { mutableStateOf(old?.currency?.ifBlank { null } ?: com.wifizone.mikhmon.Region.currency(ctx)) }
     var advanced by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var wifi by remember { mutableStateOf(WifiNetwork.detect(ctx)) }

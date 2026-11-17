@@ -3,7 +3,6 @@ package com.wifizone.mikhmon.ui
 import android.app.Activity
 import android.content.Context
 import android.net.Uri
-import android.telephony.TelephonyManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -95,8 +94,7 @@ private val DIAL = mapOf("bf" to "+226", "ci" to "+225", "sn" to "+221", "ml" to
     "cm" to "+237", "gn" to "+224", "ga" to "+241", "cg" to "+242", "cd" to "+243", "td" to "+235", "cf" to "+236", "mr" to "+222", "gh" to "+233", "ng" to "+234")
 
 fun dialPrefix(ctx: Context): String {
-    val tm = ctx.getSystemService(TelephonyManager::class.java)
-    val iso = (tm?.simCountryIso?.ifBlank { null } ?: tm?.networkCountryIso?.ifBlank { null } ?: java.util.Locale.getDefault().country).lowercase()
+    val iso = com.wifizone.mikhmon.Region.country(ctx).orEmpty().lowercase()
     return DIAL[iso] ?: "+"
 }
 

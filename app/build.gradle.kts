@@ -14,8 +14,8 @@ android {
         applicationId = "com.wifizone.mikhmon"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         // arm64-v8a : téléphones ; x86_64 : émulateur de test en CI
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

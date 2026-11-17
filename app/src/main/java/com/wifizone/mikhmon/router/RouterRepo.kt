@@ -91,10 +91,12 @@ class RouterRepo(private val ctx: Context) {
         }
     }
 
-    suspend fun users(comment: String? = null): List<HsUser> = call { r ->
+    /** Utilisateurs du hotspot : tous, ceux d'un lot ([comment]), ou un seul ([name]). */
+    suspend fun users(comment: String? = null, name: String? = null): List<HsUser> = call { r ->
         val args = mutableListOf("/ip/hotspot/user/print",
             "=.proplist=.id,name,password,profile,comment,disabled,uptime,bytes-in,bytes-out,limit-uptime,limit-bytes-total")
         if (comment != null) args += "?comment=$comment"
+        if (name != null) args += "?name=$name"
         r.command(*args.toTypedArray()).filter { it["name"] != "default-trial" }.map {
             HsUser(it[".id"].orEmpty(), it["name"].orEmpty(), it["password"].orEmpty(), it["profile"].orEmpty(), it["comment"].orEmpty(),
                 it["disabled"] == "true", it["uptime"].orEmpty(), it.long("bytes-in"), it.long("bytes-out"),

@@ -6,6 +6,9 @@ import com.wifizone.mikhmon.tickets.templates.AfricaTemplate.Motif
 import com.wifizone.mikhmon.tickets.templates.AuroraTemplate
 import com.wifizone.mikhmon.tickets.templates.CouponTemplate
 import com.wifizone.mikhmon.tickets.templates.MiniTemplate
+import com.wifizone.mikhmon.tickets.templates.MikhmonDefaultTemplate
+import com.wifizone.mikhmon.tickets.templates.MikhmonQrTemplate
+import com.wifizone.mikhmon.tickets.templates.MikhmonSmallTemplate
 import com.wifizone.mikhmon.tickets.templates.PolaroidTemplate
 import com.wifizone.mikhmon.tickets.templates.RibbonTemplate
 import com.wifizone.mikhmon.tickets.templates.SportTemplate
@@ -25,6 +28,9 @@ object Catalog {
     val all: List<TicketTemplate> by lazy {
         fun c(vararg h: String) = h.map { Colors.hex(it) }.toIntArray()
         listOf(
+            MikhmonDefaultTemplate(),
+            MikhmonQrTemplate(),
+            MikhmonSmallTemplate(),
             StandardTemplate(),
             MiniTemplate(),
             CardTemplate("tpl-carte-or", "Carte Or", Palette.of("#FFF", "#FFF", "#9A6B12", "#FFD873", "#FFF", "#E9DDC2")),

@@ -30,6 +30,16 @@ class FakeRouterOs(private val user: String = "admin", private val pass: String 
         U("*4", "wz-48213", "7731", "semaine", "up-915-11.16.26-Abonnés", uptime = "1d3h", bytesIn = 920_000_000, bytesOut = 6_400_000_000),
         U("*5", "QJ5D2M", "QJ5D2M", "1jour", "nov/18/2026 09:12:44", uptime = "6h", bytesIn = 300_000_000, bytesOut = 2_100_000_000),
     )
+    init {
+        // Un gros lot non utilisé (comme après « Générer 150 tickets ») : impression dense, groupement par profil.
+        val rnd = java.util.Random(7)
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        repeat(150) { i ->
+            val code = (1..6).map { chars[rnd.nextInt(chars.length)] }.joinToString("")
+            users += U("*${300 + i}", code, code, "1jour", "vc-517-11.17.26-Promo samedi")
+        }
+    }
+
     private val active = mutableListOf(
         mapOf(".id" to "*A1", "user" to "K7M4Q2", "address" to "10.5.50.23", "mac-address" to "3C:2E:FF:41:8A:10", "server" to "hotspot1", "login-by" to "http-chap"),
         mapOf(".id" to "*A2", "user" to "wz-48213", "address" to "10.5.50.31", "mac-address" to "A4:50:46:12:CC:07", "server" to "hotspot1", "login-by" to "cookie"),
@@ -58,7 +68,7 @@ class FakeRouterOs(private val user: String = "admin", private val pass: String 
                 re(".id" to "*P3", "name" to "mois", "shared-users" to "2", "rate-limit" to "10M/20M",
                     "on-login" to ":put (\",remc,8000,30d,8000,,Disable,\"); {}"),
             )
-            "/ip/hotspot/user/print" -> users.filter { u -> query["comment"]?.let { u.comment == it } ?: true }.map { u ->
+            "/ip/hotspot/user/print" -> users.filter { u -> (query["comment"]?.let { u.comment == it } ?: true) && (query["name"]?.let { u.name == it } ?: true) }.map { u ->
                 re(".id" to u.id, "name" to u.name, "password" to u.password, "profile" to u.profile, "comment" to u.comment,
                     "disabled" to u.disabled.toString(), "uptime" to u.uptime, "bytes-in" to u.bytesIn.toString(), "bytes-out" to u.bytesOut.toString(),
                     "limit-uptime" to u.limitUptime, "limit-bytes-total" to u.limitBytes)
