@@ -63,6 +63,7 @@ jobs:
           path: ~/.mikhmon-signing
           key: mikhmon-signing-v1
       - name: Clé de signature
+        id: sign
         env:
           KS_B64: ${{ secrets.MIKHMON_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.MIKHMON_KEYSTORE_PASSWORD }}
@@ -75,6 +76,7 @@ jobs:
             echo "Signature : clé du secret MIKHMON_KEYSTORE_B64"
           else
             if [ ! -f ~/.mikhmon-signing/ci.jks ]; then
+              echo "generated=true" >> $GITHUB_OUTPUT
               keytool -genkeypair -keystore ~/.mikhmon-signing/ci.jks -storepass mikhmon-ci-key -keypass mikhmon-ci-key \
                 -alias mikhmon -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Mikhmon Android, O=WiFi Zone"
             fi
@@ -84,7 +86,7 @@ jobs:
           fi
       - name: Garder la clé de la CI
         uses: actions/cache/save@v4
-        if: always() && hashFiles('~/.mikhmon-signing/ci.jks') != ''
+        if: always() && steps.sign.outputs.generated == 'true'
         continue-on-error: true
         with:
           path: ~/.mikhmon-signing

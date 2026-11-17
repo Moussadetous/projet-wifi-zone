@@ -65,10 +65,10 @@ class Purchase(private val activity: Activity, private val scope: CoroutineScope
             runCatching { Services.account.checkout(item, itemName, phone) }
                 .onSuccess { r ->
                     when (r) {
-                        MproClient.Checkout.Done -> { Toast.makeText(activity, "Achat activé ✓", Toast.LENGTH_SHORT).show(); onDone?.invoke() }
-                        is MproClient.Checkout.Pay -> { waiting = true; Services.account.openBrowser(activity, Uri.parse(r.url)) }
-                        is MproClient.Checkout.NeedPhone -> askPhone = item to itemName
-                        is MproClient.Checkout.NeedEmail -> error = r.message
+                        com.wifizone.mikhmon.account.MproCore.Checkout.Done -> { Toast.makeText(activity, "Achat activé ✓", Toast.LENGTH_SHORT).show(); onDone?.invoke() }
+                        is com.wifizone.mikhmon.account.MproCore.Checkout.Pay -> { waiting = true; Services.account.openBrowser(activity, Uri.parse(r.url)) }
+                        is com.wifizone.mikhmon.account.MproCore.Checkout.NeedPhone -> askPhone = item to itemName
+                        is com.wifizone.mikhmon.account.MproCore.Checkout.NeedEmail -> error = r.message
                     }
                 }
                 .onFailure { error = it.message ?: "Paiement impossible pour le moment." }
@@ -127,7 +127,7 @@ fun PurchaseDialogs(p: Purchase) {
 
 /** Accès à l'application : compte obligatoire, puis essai gratuit ou accès à vie. */
 @Composable
-fun Gate(activity: Activity, acc: MproClient.Account?, onRouterSettings: () -> Unit) {
+fun Gate(activity: Activity, acc: com.wifizone.mikhmon.account.MproCore.Account?, onRouterSettings: () -> Unit) {
     val scope = rememberCoroutineScope()
     val p = remember { Purchase(activity, scope) }
     var connecting by remember { mutableStateOf(false) }
