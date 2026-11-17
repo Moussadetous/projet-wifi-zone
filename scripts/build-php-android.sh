@@ -32,6 +32,8 @@ export CFLAGS="-O2" LDFLAGS=""
 # inutiles pour Mikhmon (gethostbyname reste disponible).
 sed -i -E 's/^#define (HAVE_RES_[A-Z_]+|HAVE_DNS_[A-Z_]+|HAVE_DN_[A-Z_]+|HAVE_FULL_DNS_FUNCS) .*$/\/* \1 désactivé pour Android *\//' main/php_config.h
 grep -n "désactivé pour Android" main/php_config.h || true
+# getdtablesize() n'existe pas dans bionic
+printf '\n#include <unistd.h>\n#define getdtablesize() ((int) sysconf(_SC_OPEN_MAX))\n' >> main/php_config.h
 
 if ! make -j"$(nproc)" > "$work/make.log" 2>&1; then
   # relance en continuant malgré les erreurs, pour toutes les voir d'un coup
