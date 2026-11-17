@@ -20,7 +20,18 @@ class UiFlowTest {
     private val ctx = inst.targetContext
     private var fake: FakeRouterOs? = null
 
-    @Before fun init() { Services.init(ctx.applicationContext as android.app.Application) }
+    @Before fun init() {
+        Services.init(ctx.applicationContext as android.app.Application)
+        // Captures propres : pas de demande d'autorisation ni d'alerte système de l'émulateur par-dessus l'application.
+        sh("pm grant ${ctx.packageName} android.permission.POST_NOTIFICATIONS")
+        sh("settings put global hide_error_dialogs 1")
+        sh("cmd statusbar collapse")
+    }
+
+    private fun sh(cmd: String) {
+        val pfd = inst.uiAutomation.executeShellCommand(cmd)
+        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+    }
 
     @After fun tearDown() {
         MikhmonServer.stop()
@@ -29,8 +40,10 @@ class UiFlowTest {
     }
 
     private fun shot(name: String) {
-        val pfd = inst.uiAutomation.executeShellCommand("screencap -p /data/local/tmp/mikhmon-$name.png")
-        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.readBytes() }
+        // Ferme une éventuelle alerte « … ne répond pas » de l'émulateur avant la capture.
+        sh("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS")
+        Thread.sleep(400)
+        sh("screencap -p /data/local/tmp/mikhmon-$name.png")
     }
 
     private fun account(status: String, items: List<String> = emptyList(), days: Long = 5): String {

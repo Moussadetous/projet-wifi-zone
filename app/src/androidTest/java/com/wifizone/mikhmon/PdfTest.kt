@@ -28,7 +28,7 @@ class PdfTest {
         Voucher(u, p, "1jour", "500", "24 h", "2 Go", "5 Mb/s", serial = i + 1)
     }
 
-    @Test fun everyTemplateExportsALightPdf() = runBlocking {
+    @Test fun everyTemplateExportsALightPdf(): Unit = runBlocking {
         val report = StringBuilder()
         for (t in Catalog.all) {
             val s = PrintSettings(if (t.id.startsWith("tpl-thermique")) PaperFormat.ROLL58 else PaperFormat.A4)
@@ -41,21 +41,25 @@ class PdfTest {
         }
         Log.i("PdfTest", "\n$report")
         println(report)
+        Unit
     }
 
-    @Test fun a4CardsLayout() = runBlocking {
+    @Test fun a4CardsLayout(): Unit = runBlocking {
         val t = Catalog.byId("tpl-carte-or")!!
         val f = PdfExporter.exportToCache(ctx, t, vouchers, brand, TicketOptions(), PrintSettings(PaperFormat.A4))
         val r = PdfRenderer(ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY))
         assertEquals("10 cartes par page A4 : 25 tickets = 3 pages", 3, r.pageCount)
         r.openPage(0).use { p -> assertEquals(595, p.width); assertEquals(842, p.height) }
         r.close()
+        f.delete()
+        Unit
     }
 
-    @Test fun savedInDownloads() = runBlocking {
+    @Test fun savedInDownloads(): Unit = runBlocking {
         val r = PdfExporter.export(ctx, Catalog.byId("std-standard")!!, vouchers.take(5), brand, TicketOptions(), PrintSettings())
         assertTrue(r.bytes > 1000)
         ctx.contentResolver.openInputStream(r.uri)!!.use { assertEquals("%PDF", String(it.readNBytes(4))) }
         ctx.contentResolver.delete(r.uri, null, null)
+        Unit
     }
 }
