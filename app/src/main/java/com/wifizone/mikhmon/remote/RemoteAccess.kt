@@ -109,7 +109,9 @@ object RemoteAccess {
     // ------------------------------------------------------------------ tunnel
     private fun build(c: WgConf, s: MikhmonSettings): Config {
         // Le tunnel ne sert qu'à joindre le routeur : passerelle Back To Home et adresse du routeur sur son réseau.
-        val targets = listOfNotNull(c.routerAddress, s.routerIp.takeIf { WgConf.isIpv4(it) }).distinct().joinToString(", ") { "$it/32" }
+        // Android refuse les adresses locales (127.x, 169.254.x, 0.x) dans les routes d'un VPN.
+        fun routable(ip: String?) = ip != null && WgConf.isIpv4(ip) && !ip.startsWith("127.") && !ip.startsWith("169.254.") && !ip.startsWith("0.")
+        val targets = listOfNotNull(c.routerAddress, s.routerIp).filter { routable(it) }.distinct().joinToString(", ") { "$it/32" }
         val iface = Interface.Builder()
             .parsePrivateKey(c.privateKey)
             .parseAddresses(c.addresses.joinToString(", "))
