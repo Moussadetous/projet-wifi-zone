@@ -1,0 +1,8 @@
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+# Téléchargés par scripts/fetch-assets.sh
+app/src/main/jniLibs/
+app/src/main/assets/mikhmon/
