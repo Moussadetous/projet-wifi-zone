@@ -6,7 +6,11 @@ java {
 }
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach { kotlinOptions.jvmTarget = "17" }
 
-dependencies { testImplementation("junit:junit:4.13.2") }
+dependencies {
+    // QR codes des tickets (Apache 2.0, pur Java)
+    implementation("com.google.zxing:core:3.5.3")
+    testImplementation("junit:junit:4.13.2")
+}
 
 tasks.test {
     testLogging {
@@ -14,4 +18,6 @@ tasks.test {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         showStandardStreams = true
     }
+    // Aperçus des modèles (images PNG) : PREVIEW_DIR=/chemin gradle :core:test
+    System.getenv("PREVIEW_DIR")?.let { environment("PREVIEW_DIR", it) }
 }
