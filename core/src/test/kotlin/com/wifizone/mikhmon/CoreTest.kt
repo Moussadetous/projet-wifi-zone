@@ -69,7 +69,10 @@ class CoreTest {
         FakeRouterOs().start().use { f ->
             try { RouterOs.connect("127.0.0.1", "admin", "faux", port = f.port); fail() }
             catch (e: RouterOsException) { assertEquals(RouterOsException.Kind.BAD_LOGIN, e.kind) }
-            val closedPort = f.port.also { f.close() }
+        }
+        // port sans aucun serveur (pris puis libéré avant le test)
+        val closedPort = java.net.ServerSocket(0).use { it.localPort }
+        run {
             try { RouterOs.connect("127.0.0.1", "admin", "secret", port = closedPort); fail() }
             catch (e: RouterOsException) { assertEquals(RouterOsException.Kind.API_DISABLED, e.kind) }
         }
