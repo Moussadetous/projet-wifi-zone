@@ -28,7 +28,19 @@ export CFLAGS="-O2" LDFLAGS=""
   --without-pcre-jit --disable-opcache --without-valgrind --without-sqlite3 --without-libxml \
   > "$work/configure.log" 2>&1 || { tail -80 "$work/configure.log"; tail -200 config.log; exit 1; }
 
-make -j"$(nproc)" > "$work/make.log" 2>&1 || { grep -n "error" "$work/make.log" | head -40; tail -60 "$work/make.log"; exit 1; }
+# Android (bionic) n'expose pas l'API resolver (res_nsearch, dn_skipname...) : on retire dns_get_record & co,
+# inutiles pour Mikhmon (gethostbyname reste disponible).
+sed -i -E 's/^#define (HAVE_RES_[A-Z_]+|HAVE_DNS_[A-Z_]+|HAVE_DN_[A-Z_]+|HAVE_FULL_DNS_FUNCS) .*$/\/* \1 désactivé pour Android *\//' main/php_config.h
+grep -n "désactivé pour Android" main/php_config.h || true
+
+if ! make -j"$(nproc)" > "$work/make.log" 2>&1; then
+  # relance en continuant malgré les erreurs, pour toutes les voir d'un coup
+  make -k -j"$(nproc)" > "$work/make-k.log" 2>&1 || true
+  echo "=== erreurs de compilation ==="
+  grep -E "error:|undefined reference|Error [0-9]" "$work/make-k.log" | sort -u | head -80
+  tail -30 "$work/make-k.log"
+  exit 1
+fi
 
 mkdir -p "$OUT"
 "$STRIP" -o "$OUT/libphp.so" sapi/cli/php

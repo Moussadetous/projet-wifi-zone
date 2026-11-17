@@ -8,6 +8,7 @@ jobs:
     name: PHP pour Android (${{ matrix.abi }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         abi: [arm64-v8a, x86_64]
     steps:
