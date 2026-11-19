@@ -88,11 +88,37 @@ object RemotePlan {
 
     fun item(start: LocalDate): String = PREFIX + start.format(FMT)
 
-    /** Périodes payées : début (inclus) et fin (exclue). */
-    fun periods(items: Collection<String>): List<Pair<LocalDate, LocalDate>> =
-        items.filter { it.startsWith(PREFIX) }
-            .mapNotNull { runCatching { LocalDate.parse(it.removePrefix(PREFIX), FMT) }.getOrNull() }
-            .distinct().sorted().map { it to it.plusMonths(MONTHS) }
+    /**
+     * Articles « distance-AAAAMMJJ » (2 mois achetés) et « distance-AAAAMMJJ-1m-fN » (mois offerts par le parrainage) :
+     * date de début et nombre de mois.
+     */
+    private val ITEM = Regex("^" + Regex.escape(PREFIX) + "(\\d{8})(?:-(\\d{1,3})m)?(?:-[a-z0-9]+)*$")
+
+    fun parse(item: String): Pair<LocalDate, Long>? {
+        val m = ITEM.find(item) ?: return null
+        val start = runCatching { LocalDate.parse(m.groupValues[1], FMT) }.getOrNull() ?: return null
+        val months = m.groupValues[2].toLongOrNull() ?: MONTHS
+        return if (months in 1..120) start to months else null
+    }
+
+    /**
+     * Périodes d'accès : début (inclus) et fin (exclue). Elles s'enchaînent : une période qui commence pendant une
+     * autre (mois offert alors que l'abonnement court encore) démarre à la fin de celle-ci, rien n'est perdu.
+     */
+    fun periods(items: Collection<String>): List<Pair<LocalDate, LocalDate>> {
+        val out = ArrayList<Pair<LocalDate, LocalDate>>()
+        var end: LocalDate? = null
+        for ((start, months) in items.mapNotNull { parse(it) }.sortedWith(compareBy({ it.first }, { -it.second }))) {
+            val from = if (end != null && end.isAfter(start)) end else start
+            val to = from.plusMonths(months)
+            out += from to to
+            end = to
+        }
+        return out
+    }
+
+    /** Mois offerts par le parrainage parmi les articles. */
+    fun gifted(items: Collection<String>): Int = items.count { it.startsWith(PREFIX) && Regex("-\\d+m-").containsMatchIn(it) }
 
     /** Dernier jour d'accès (inclus) si l'accès est ouvert aujourd'hui, sinon null. */
     fun activeUntil(items: Collection<String>, today: LocalDate): LocalDate? {
@@ -151,6 +177,14 @@ object BackToHome {
         runCatching { r.command("/system/routerboard/print").firstOrNull()?.get("serial-number") }.getOrNull()?.ifBlank { null }
             ?: runCatching { r.command("/system/license/print").firstOrNull()?.get("software-id") }.getOrNull()?.ifBlank { null }
             ?: runCatching { r.command("/system/identity/print").firstOrNull()?.get("name") }.getOrNull().orEmpty()
+
+    /**
+     * Identifiant matériel du routeur (numéro de série, sinon identifiant de licence) ; vide s'il n'en a pas.
+     * Sert au parrainage : un filleul compte quand l'application a vu SON routeur (seule une empreinte est envoyée).
+     */
+    fun hardwareId(r: RouterOs): String =
+        runCatching { r.command("/system/routerboard/print").firstOrNull()?.get("serial-number") }.getOrNull()?.trim()?.ifBlank { null }
+            ?: runCatching { r.command("/system/license/print").firstOrNull()?.get("software-id") }.getOrNull()?.trim().orEmpty()
 
     const val RULE_COMMENT = "Mikhmon Android : acces a distance"
 

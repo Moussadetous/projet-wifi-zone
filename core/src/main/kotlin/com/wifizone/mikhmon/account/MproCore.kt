@@ -45,10 +45,27 @@ class MproCore(
         val currency: String, val pending: String?, val checkedAt: Long,
         /** Article dont le paiement attend sa confirmation (« lifetime », un modèle…), ou null. */
         val pendingItem: String? = null,
+        /** Parrainage (null : la boutique ne le propose pas, ou version ancienne). */
+        val referral: Referral? = null,
     ) {
         val unlocked get() = status == "lifetime" || status == "trial"
         fun priceOf(item: String) = itemPrices[item] ?: itemPrice
     }
+
+    /** Filleul : prénom seulement, validé quand l'application a vu son propre routeur. */
+    data class Child(val name: String, val valid: Boolean)
+
+    data class Referral(
+        val code: String,
+        /** Filleuls validés pour une récompense, et mois offerts à chaque fois. */
+        val goal: Int, val months: Int,
+        val valid: Int, val pending: Int, val progress: Int, val rewarded: Int,
+        val children: List<Child>,
+        /** Parrain de ce compte (prénom), et s'il est déjà validé. */
+        val referredBy: String?, val referredValid: Boolean,
+        val canUseCode: Boolean, val useUntil: String?,
+        val shareUrl: String,
+    )
 
     sealed interface Checkout {
         object Done : Checkout
@@ -186,6 +203,18 @@ class MproCore(
             pending = pend?.let { if (it.optString("item") == "lifetime") "l’accès à vie" else it.optString("item_name").ifBlank { it.optString("item") } },
             checkedAt = checkedAt,
             pendingItem = pend?.optString("item")?.ifBlank { null },
+            referral = j.optJSONObject("referral")?.takeIf { it.optBoolean("enabled") && it.optString("code").isNotBlank() }?.let { r ->
+                val by = r.optJSONObject("referred_by")
+                val kids = r.optJSONArray("children")
+                Referral(
+                    code = r.optString("code"), goal = r.optInt("goal", 4).coerceAtLeast(1), months = r.optInt("months", 1),
+                    valid = r.optInt("valid"), pending = r.optInt("pending"), progress = r.optInt("progress"), rewarded = r.optInt("rewarded"),
+                    children = kids?.let { a -> (0 until a.length()).map { i -> a.getJSONObject(i).let { Child(it.optString("name"), it.optBoolean("valid")) } } } ?: emptyList(),
+                    referredBy = by?.optString("name")?.ifBlank { null }, referredValid = by?.optBoolean("valid") ?: false,
+                    canUseCode = r.optBoolean("can_use_code"), useUntil = r.optString("use_until").ifBlank { null },
+                    shareUrl = r.optString("share_url"),
+                )
+            },
         )
     }
 
@@ -243,6 +272,26 @@ class MproCore(
     fun checkoutStatus(): Account? {
         if (token == null || testMode) return current
         return apply(request("POST", "/api/app/checkout/status", JSONObject()))
+    }
+
+    /** Saisit le code d'un parrain (erreur claire si le code est inconnu, déjà saisi, etc.). */
+    fun useReferralCode(code: String): Account {
+        if (testMode) return current ?: throw ApiError(401, "Connectez-vous à votre compte.")
+        return apply(request("POST", "/api/app/referral/use", JSONObject().put("code", code.trim())))
+    }
+
+    /**
+     * Signale le routeur utilisé, par une empreinte de son numéro de série (le numéro ne quitte pas le téléphone) :
+     * c'est ce qui valide un filleul. Une seule fois par routeur.
+     */
+    fun reportRouter(serial: String) {
+        if (token == null || testMode || serial.isBlank()) return
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest("mikhmon-router:${serial.trim()}".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        val key = "router_sent_" + (current?.email ?: "")
+        if (prefs.get(key)?.split(',')?.contains(hash.take(16)) == true) return
+        apply(request("POST", "/api/app/router", JSONObject().put("hash", hash)))
+        prefs.put(key, ((prefs.get(key)?.split(',') ?: emptyList()) + hash.take(16)).takeLast(10).joinToString(","))
     }
 
     fun cancelPending() {

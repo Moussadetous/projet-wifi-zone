@@ -114,6 +114,8 @@ fun HomeScreen(activity: Activity, nav: Nav) {
                 }
             }
         }
+        // Parrainage : partager l'application (4 amis = 1 mois d'accès à distance), ou saisir le code d'un ami.
+        item { ReferralBanner(Modifier.padding(bottom = 12.dp)) { nav.open(Overlay.Referral) } }
         account?.takeIf { it.status == "trial" }?.let { a ->
             item {
                 Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(18.dp)).background(Brand.Premium).clickable { purchase.buy("lifetime") }.padding(14.dp),

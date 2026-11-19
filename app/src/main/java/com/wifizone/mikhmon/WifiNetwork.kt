@@ -20,6 +20,9 @@ object WifiNetwork {
         for (n in cm.allNetworks) {
             val caps = cm.getNetworkCapabilities(n) ?: continue
             if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue
+            // Le tunnel de l'accès à distance (VPN) se déclare aussi « Wi-Fi » quand il passe par un Wi-Fi :
+            // ce n'est pas le Wi-Fi lui-même, il ne dit rien du réseau du routeur.
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) continue
             val lp = cm.getLinkProperties(n) ?: continue
             val own = lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address }?.hostAddress
             val gw = lp.routes.firstOrNull { it.isDefaultRoute && it.gateway is Inet4Address }

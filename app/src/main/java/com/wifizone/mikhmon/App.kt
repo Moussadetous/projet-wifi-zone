@@ -13,6 +13,7 @@ class App : Application() {
         super.onCreate()
         Services.init(this)
         runCatching { Region.migrateCurrency(this) }
+        com.wifizone.mikhmon.remote.RemoteAccess.watchNetwork()
     }
 }
 

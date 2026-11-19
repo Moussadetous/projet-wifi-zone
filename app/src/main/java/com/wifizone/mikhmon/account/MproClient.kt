@@ -79,6 +79,8 @@ class MproClient(
         withContext(Dispatchers.IO) { core.checkout(item, itemName, phone, email) }
     suspend fun checkoutStatus() = withContext(Dispatchers.IO) { core.checkoutStatus() }
     suspend fun cancelPending() = withContext(Dispatchers.IO) { core.cancelPending() }
+    suspend fun useReferralCode(code: String) = withContext(Dispatchers.IO) { core.useReferralCode(code) }
+    suspend fun reportRouter(serial: String) = withContext(Dispatchers.IO) { runCatching { core.reportRouter(serial) } }
     suspend fun logout() = withContext(Dispatchers.IO) { core.logout() }
     fun seedForTests(json: String?) = core.seedForTests(json)
     fun graceDaysLeft() = core.graceDaysLeft()

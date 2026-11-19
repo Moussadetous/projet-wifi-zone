@@ -65,6 +65,10 @@ class UiFlowTest {
         sh("screencap -p /data/local/tmp/mikhmon-$name.png")
     }
 
+    private val referral = """{"enabled":true,"code":"K7M4Q2","goal":4,"months":1,"max":0,"valid":5,"pending":1,"progress":1,"rewarded":1,
+        "children":[{"name":"Moussa","valid":true},{"name":"Fatou","valid":false},{"name":"Ibrahim","valid":true},{"name":"Awa","valid":true},
+        {"name":"Salif","valid":true},{"name":"Aïcha","valid":true}],"referred_by":null,"can_use_code":true,"share_url":"https://mprodigital.shop/mikhmon"}"""
+
     private fun account(status: String, items: List<String> = emptyList(), days: Long = 5, pending: String? = null): String {
         val end = OffsetDateTime.now(ZoneOffset.UTC).plusDays(if (status == "trial") days else -1).withNano(0).toString()
         val pend = if (pending == null) "null" else "{\"item\":\"$pending\",\"item_name\":\"\",\"price\":4000,\"amount\":5000,\"at\":\"$end\"}"
@@ -73,6 +77,7 @@ class UiFlowTest {
             "license":{"status":"$status","trial_end":"$end","days_left":$days},
             "items":[${items.joinToString(",") { "\"$it\"" }}],
             "pending":$pend,
+            "referral":$referral,
             "currency":"francs CFA"}"""
     }
 
@@ -216,6 +221,15 @@ class UiFlowTest {
                 RemoteAccess.importConfig(c.copy(endpoint = "127.0.0.1:51820").text())
                 RemoteAccess.ensureUp(SettingsStore(ctx).load()!!)
                 assertTrue("Tunnel WireGuard ouvert", RemoteAccess.up.value)
+                // Sur le Wi-Fi du routeur, une connexion passée par le tunnel doit être refaite en direct (plus rapide).
+                val st = SettingsStore(ctx).load()!!
+                assertTrue(RemoteAccess.modeChanged(st, viaTunnel = true))
+                assertFalse(RemoteAccess.modeChanged(st, viaTunnel = false))
+                // Le tunnel (VPN) n'est jamais pris pour le Wi-Fi du routeur.
+                val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java)
+                WifiNetwork.detect(ctx).network?.let { n ->
+                    assertFalse(cm.getNetworkCapabilities(n)!!.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN))
+                }
                 Thread.sleep(1500)
                 RemoteAccess.down()
                 assertFalse(RemoteAccess.up.value)
@@ -243,6 +257,14 @@ class UiFlowTest {
         Services.design.savePrint("tpl-aurore", PrintSettings(PaperFormat.A4, perPage = 10))
         open("studio", 8000, "19-modele-a-payer-code-160")
         open("compte", 4000, "20-paiement-en-attente")
+    }
+
+    /** Parrainage : code, partage de l'application, 4 amis = 1 mois, filleuls, saisie du code d'un parrain. */
+    @Test fun referral() {
+        routerReady()
+        Services.account.seedForTests(account("lifetime", listOf("distance-20261119-1m-f1")))
+        open("parrainage", 3500, "21-parrainage")
+        open(null, 5000, "22-accueil-parrainage")
     }
 
     @Test fun setupScreen() {

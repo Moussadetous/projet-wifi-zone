@@ -57,6 +57,23 @@ class RemoteTest {
         assertTrue(RemotePlan.label(d).contains("17/11/2026 → 16/01/2027"))
     }
 
+    /** Mois offerts par le parrainage (« distance-AAAAMMJJ-1m-fN ») : seuls, ou ajoutés à la fin de l'abonnement. */
+    @Test fun giftedMonthsStack() {
+        val d = LocalDate.of(2026, 11, 19)
+        val gift = "distance-20261119-1m-f1"
+        assertEquals(LocalDate.of(2026, 11, 19) to 1L, RemotePlan.parse(gift))
+        assertEquals(LocalDate.of(2026, 12, 18), RemotePlan.activeUntil(setOf(gift), d))
+        assertEquals(1, RemotePlan.gifted(setOf(gift, "distance-20261117", "tpl-or")))
+        // Abonnement en cours jusqu'au 16/01 : le mois offert vient après, rien n'est perdu.
+        val paid = setOf("distance-20261117", "distance-20270117")
+        assertEquals(LocalDate.of(2027, 3, 16), RemotePlan.activeUntil(paid, d))
+        assertEquals(LocalDate.of(2027, 4, 16), RemotePlan.activeUntil(paid + gift, d))
+        assertEquals(LocalDate.of(2027, 5, 16), RemotePlan.activeUntil(paid + gift + "distance-20261125-1m-f2", d))
+        assertEquals(LocalDate.of(2027, 5, 17), RemotePlan.nextStart(paid + gift + "distance-20261125-1m-f2", d))
+        assertNull(RemotePlan.parse("distance-2026111"))
+        assertNull(RemotePlan.parse("distance-20261119-0m-f1"))
+    }
+
     @Test fun detectsSupport() {
         FakeRouterOs().start().use { f ->
             RouterOs.connect("127.0.0.1", "admin", "secret", port = f.port).use { r ->

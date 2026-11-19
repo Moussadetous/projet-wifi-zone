@@ -112,7 +112,10 @@ fun RemoteScreen(activity: Activity, nav: Nav) {
         BackHeader("Accès à distance", { nav.overlay = null }, "Back To Home de MikroTik")
         Column(Modifier.padding(horizontal = 16.dp)) {
             RemoteHero(price, perMonth, active = until)
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
+            // Gratuit par le parrainage (si le routeur le permet).
+            if (support?.supported != false) ReferralBanner(Modifier.padding(bottom = 4.dp)) { nav.open(Overlay.Referral) }
+            Spacer(Modifier.height(10.dp))
             val s = support
             when {
                 s == null -> Panel(Modifier.fillMaxWidth()) {

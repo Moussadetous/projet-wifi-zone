@@ -108,6 +108,13 @@ fun AccountScreen(activity: Activity, nav: Nav) {
                     }
                 }
             }
+            SectionTitle("Parrainage")
+            Panel(Modifier.fillMaxWidth(), padding = 4.dp) {
+                val r = acc?.referral
+                Line(Icons.GIFT, "Partager l'application", r?.let { "Code ${it.code} · ${it.goal} amis = ${it.months} mois d'accès à distance offert" }
+                    ?: "Gagnez l'accès à distance en invitant vos amis") { nav.open(Overlay.Referral) }
+                if (r != null && r.canUseCode && r.referredBy == null) Line(Icons.KEY, "Saisir le code d'un parrain", "Un ami vous a fait découvrir l'application ?") { nav.open(Overlay.Referral) }
+            }
             SectionTitle("Routeur")
             Panel(Modifier.fillMaxWidth(), padding = 4.dp) {
                 Line(Icons.WIFI, "Modifier la connexion au routeur", settings?.let { "${it.routerUser}@${it.routerIp}" }) { nav.open(Overlay.Setup) }

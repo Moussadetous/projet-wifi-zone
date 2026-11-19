@@ -150,7 +150,55 @@ object RemoteAccess {
         return w.gateway == s.routerIp || sameLan(w.ownIp, s.routerIp)
     }
 
-    fun remoteMode(s: MikhmonSettings): Boolean = ready && !onRouterWifi(s)
+    fun remoteMode(s: MikhmonSettings): Boolean = ready && !onRouterWifi(s) || directFailedHere()
+
+    /**
+     * Wi-Fi sur lequel la connexion directe a échoué (autre MikroTik à la même adresse…) : on y reste à distance
+     * sans réessayer à chaque lecture. Oublié dès que le téléphone change de réseau.
+     */
+    @Volatile private var directFailedOn: String? = null
+    private fun currentWifi(): String? = WifiNetwork.detect(ctx).network?.toString()
+    private fun directFailedHere(): Boolean = ready && directFailedOn != null && directFailedOn == currentWifi()
+
+    /**
+     * La connexion ouverte ne correspond plus au réseau : passée par le tunnel alors que le téléphone est revenu
+     * sur le Wi-Fi du routeur (le direct est bien plus rapide), ou directe alors qu'il l'a quitté.
+     */
+    fun modeChanged(s: MikhmonSettings, viaTunnel: Boolean): Boolean = viaTunnel != remoteMode(s)
+
+    /** Surveille le Wi-Fi : dès le retour sur celui du routeur, la connexion repasse en direct (et inversement). */
+    fun watchNetwork() {
+        val cm = ctx.getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        // Vrai Wi-Fi seulement (la demande exclut les VPN par défaut), avec ou sans Internet.
+        val req = android.net.NetworkRequest.Builder().addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+            .removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
+        val cb = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) = recheck()
+            override fun onLost(network: android.net.Network) = recheck()
+            override fun onLinkPropertiesChanged(network: android.net.Network, lp: android.net.LinkProperties) = recheck()
+        }
+        runCatching { cm.registerNetworkCallback(req, cb) }
+    }
+
+    private val rechecking = java.util.concurrent.atomic.AtomicBoolean(false)
+    /** Test ou diagnostic en cours : ils passent volontairement par le tunnel, même sur le Wi-Fi du routeur. */
+    private val forcing = java.util.concurrent.atomic.AtomicInteger(0)
+    private suspend fun <T> forced(block: suspend () -> T): T { forcing.incrementAndGet(); try { return block() } finally { forcing.decrementAndGet() } }
+    private fun recheck() {
+        if (!rechecking.compareAndSet(false, true)) return
+        Thread {
+            try {
+                Thread.sleep(1500) // laisse le Wi-Fi obtenir son adresse et sa passerelle
+                val s = Services.settings.load() ?: return@Thread
+                if (directFailedOn != null && directFailedOn != currentWifi()) directFailedOn = null
+                kotlinx.coroutines.runBlocking { Services.router.recheck() }
+                if (up.value && !remoteMode(s) && forcing.get() == 0) down()
+            } catch (_: Exception) {
+            } finally {
+                rechecking.set(false)
+            }
+        }.start()
+    }
 
     // ------------------------------------------------------------------ tunnel
     private fun build(c: WgConf, s: MikhmonSettings): Config {
@@ -250,11 +298,12 @@ object RemoteAccess {
             down()
             val local = try {
                 val r = RouterOs.connect(s.routerIp, s.routerUser, s.routerPass, s.routerPort, timeoutMs) { WifiNetwork.socketFor(ctx, s.routerIp) }
-                if (sameRouter(r)) { lastError.value = null; return r }
+                if (sameRouter(r)) { lastError.value = null; directFailedOn = null; return r }
                 r.close()
                 RouterOsException(RouterOsException.Kind.UNREACHABLE, "Ce Wi-Fi n'est pas celui de votre routeur : un autre MikroTik répond à l'adresse ${s.routerIp}.")
             } catch (e: RouterOsException) { e }
             if (!ready) throw local
+            directFailedOn = currentWifi()
         }
         return try {
             remote(s).also { lastError.value = null }
@@ -347,7 +396,9 @@ object RemoteAccess {
      * Diagnostic de l'accès à distance, étape par étape. Passe toujours par le tunnel, même sur le Wi-Fi du routeur :
      * il montre précisément ce qui bloque (abonnement, activation, autorisation VPN, relais, pare-feu du routeur).
      */
-    suspend fun diagnose(): List<Step> = withContext(Dispatchers.IO) {
+    suspend fun diagnose(): List<Step> = forced { diagnoseNow() }
+
+    private suspend fun diagnoseNow(): List<Step> = withContext(Dispatchers.IO) {
         val out = ArrayList<Step>()
         val s = Services.settings.load() ?: return@withContext listOf(Step("Routeur", false, "routeur non configuré"))
         val sup = support.value
@@ -391,9 +442,13 @@ object RemoteAccess {
     }
 
     /** Teste la connexion à distance (même sur le Wi-Fi du routeur) : renvoie le nom du routeur. */
-    suspend fun test(): String = withContext(Dispatchers.IO) {
-        val s = Services.settings.load() ?: throw IllegalStateException("Routeur non configuré")
-        connect(s, forceRemote = true).use { r -> r.command("/system/identity/print").firstOrNull()?.get("name").orEmpty() }
+    suspend fun test(): String = forced {
+        withContext(Dispatchers.IO) {
+            val s = Services.settings.load() ?: throw IllegalStateException("Routeur non configuré")
+            val name = connect(s, forceRemote = true).use { r -> r.command("/system/identity/print").firstOrNull()?.get("name").orEmpty() }
+            if (!remoteMode(s)) down() // sur le Wi-Fi du routeur, on repasse en direct après le test
+            name
+        }
     }
 
     /** Retire l'accès de ce téléphone (sur le routeur si possible) et ferme le tunnel. */

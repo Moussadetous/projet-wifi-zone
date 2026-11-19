@@ -60,6 +60,7 @@ sealed interface Overlay {
     object Setup : Overlay
     /** Accès au routeur depuis n'importe où (Back To Home). */
     object Remote : Overlay
+    object Referral : Overlay
     /**
      * Impression de tickets (générateur PDF avec aperçu). Les tickets sont donnés ([users]) ou lus sur le routeur :
      * un lot Mikhmon ([comment]), un profil ([profile]) ou un seul ticket ([userName]).
@@ -116,6 +117,9 @@ fun AppRoot(activity: Activity) {
         val id = runCatching { Services.router.resource() }.getOrNull()
         Services.account.ping(listOfNotNull(id?.identity, id?.board, id?.version).joinToString(" · "))
         gateChecked = true
+        // Parrainage : le routeur connecté (empreinte de son numéro de série) valide le filleul.
+        if (id != null) runCatching { Services.router.call { com.wifizone.mikhmon.remote.BackToHome.hardwareId(it) } }.getOrNull()
+            ?.takeIf { it.isNotBlank() }?.let { Services.account.reportRouter(it) }
         // Le routeur sait-il faire l'accès à distance ? (l'offre n'est proposée que s'il le peut)
         if (id != null) {
             RemoteAccess.refreshSupport()
@@ -155,6 +159,7 @@ fun AppRoot(activity: Activity) {
             "mikhmon" -> nav.tab = Tab.MIKHMON
             "journal" -> nav.open(Overlay.Logs)
             "distance" -> nav.open(Overlay.Remote)
+            "parrainage" -> nav.open(Overlay.Referral)
             "compte" -> nav.open(Overlay.Account)
             "accueil" -> nav.tab = Tab.HOME
             "studio" -> scope.launch {
@@ -233,6 +238,7 @@ fun AppRoot(activity: Activity) {
         is Overlay.Setup -> { SetupScreen(onDone = { MikhmonServer.restart(activity); Services.router.reset(); nav.overlay = null }, onCancel = { nav.overlay = null }); return }
         is Overlay.Studio -> { StudioScreen(activity, nav, o); return }
         is Overlay.Remote -> { RemoteScreen(activity, nav); return }
+        is Overlay.Referral -> { ReferralScreen(activity, nav); return }
         is Overlay.MikhmonUrl, null -> {}
     }
 

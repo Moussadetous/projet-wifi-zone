@@ -144,6 +144,46 @@ class MproCoreIntegrationTest {
         // Hors ligne : le compte reste disponible depuis le cache.
         assertEquals("lifetime", phone2.cached()!!.status)
 
+        // Parrainage : Awa partage son code ; 4 amis le saisissent et connectent LEUR routeur → 1 mois offert.
+        val ref = phone1.refresh()!!.referral!!
+        assertTrue(Regex("^[A-Z2-9]{6}$").matches(ref.code))
+        assertEquals(4, ref.goal); assertEquals(1, ref.months)
+        phone1.reportRouter("HEX-AWA-0001")
+        fun friend(i: Int): MproCore {
+            val b = Browser(base)
+            val t = URL("$base/control/google-token?sub=ami-$i&email=ami$i@gmail.com&name=Ami$i%20Test").readText()
+            assertEquals(200, b.call("POST", "/api/login/google", JSONObject().put("credential", t)).first)
+            val p = MproCore("mikhmon-droid", "mikhmondroid", "0.6.0", listOf(base), MemPrefs(), device = "Ami $i")
+            val qq = query(p.loginUrl())
+            b.csrf = JSONObject(b.call("GET", "/api/app-auth/info?app=mikhmon-droid&redirect_uri=mikhmondroid%3A%2F%2Fauth").second).getString("csrf")
+            val a = JSONObject(b.call("POST", "/api/app-auth/authorize", JSONObject().put("app", "mikhmon-droid")
+                .put("challenge", qq["challenge"]).put("state", qq["state"]).put("redirect_uri", "mikhmondroid://auth")).second)
+            val bk = query(a.getString("direct"))
+            p.completeLogin(bk["code"], bk["state"])
+            return p
+        }
+        val friends = (1..4).map { friend(it) }
+        val wrong = runCatching { friends[0].useReferralCode("ZZZZZZ") }.exceptionOrNull() as MproCore.ApiError
+        assertEquals(404, wrong.code)
+        val f1 = friends[0].useReferralCode(ref.code.lowercase())
+        assertEquals("Awa", f1.referral!!.referredBy)
+        assertTrue(!f1.referral!!.referredValid)
+        friends[0].reportRouter("HEX-AWA-0001") // le routeur du parrain ne compte pas
+        assertTrue(!friends[0].account!!.referral!!.referredValid)
+        friends[0].reportRouter("HEX-AMI-0001")
+        assertTrue(friends[0].account!!.referral!!.referredValid)
+        for ((i, f) in friends.withIndex().drop(1)) { f.useReferralCode(ref.code); f.reportRouter("HEX-AMI-000${i + 1}") }
+        val awa = phone1.refresh()!!
+        assertEquals(4, awa.referral!!.valid)
+        assertEquals(1, awa.referral!!.rewarded)
+        assertEquals(0, awa.referral!!.progress)
+        assertEquals(4, awa.referral!!.children.count { it.valid })
+        val gift = awa.items.single { it.startsWith("distance-") && it.contains("-1m-") }
+        assertEquals(1, com.wifizone.mikhmon.remote.RemotePlan.gifted(awa.items))
+        val today = java.time.LocalDate.now(java.time.ZoneOffset.UTC)
+        assertEquals(today.plusMonths(1).minusDays(1), com.wifizone.mikhmon.remote.RemotePlan.activeUntil(awa.items, today))
+        assertTrue(gift.endsWith("-1m-f1"))
+
         phone2.logout()
         assertNull(phone2.account)
         assertTrue(!phone2.loggedIn)

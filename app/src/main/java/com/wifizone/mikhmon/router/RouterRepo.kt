@@ -46,15 +46,29 @@ data class Sale(val date: String, val time: String, val user: String, val price:
 class RouterRepo(private val ctx: Context) {
     private val mutex = Mutex()
     private var conn: RouterOs? = null
+    /** La connexion ouverte passe par le tunnel de l'accès à distance. */
+    private var viaTunnel = false
 
     private fun open(): RouterOs {
         val s = SettingsStore(ctx).load() ?: throw IllegalStateException("Routeur non configuré")
         // Wi-Fi du routeur : connexion directe ; ailleurs, accès à distance (Back To Home) s'il est payé et activé.
         return com.wifizone.mikhmon.remote.RemoteAccess.connect(s, timeoutMs = 8000)
+            .also { viaTunnel = com.wifizone.mikhmon.remote.RemoteAccess.up.value }
     }
+
+    /** Ferme la connexion si elle ne correspond plus au réseau (retour sur le Wi-Fi du routeur, ou départ). */
+    private fun dropIfStale() {
+        val c = conn ?: return
+        val s = SettingsStore(ctx).load() ?: return
+        if (com.wifizone.mikhmon.remote.RemoteAccess.modeChanged(s, viaTunnel)) { runCatching { c.close() }; conn = null }
+    }
+
+    /** Vérifie le mode de connexion tout de suite (appelé quand le Wi-Fi change). */
+    suspend fun recheck() = withContext(Dispatchers.IO) { mutex.withLock { dropIfStale() } }
 
     suspend fun <T> call(block: (RouterOs) -> T): T = withContext(Dispatchers.IO) {
         mutex.withLock {
+            dropIfStale()
             try {
                 val c = conn ?: open().also { conn = it }
                 block(c)
