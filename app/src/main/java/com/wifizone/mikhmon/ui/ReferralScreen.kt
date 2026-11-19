@@ -264,7 +264,9 @@ fun ReferralBanner(modifier: Modifier = Modifier, onClick: () -> Unit) {
         IconBadge(Icons.GIFT, Brand.Pink, 36.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(if (r.canUseCode && r.referredBy == null) "Invité par un ami ? Saisissez son code" else "Partagez l'application : ${r.goal} amis = $months offert",
+            // Nouveau venu (pas encore de filleul ni de parrain) : on lui propose d'abord de saisir le code de son ami.
+            val newcomer = r.canUseCode && r.referredBy == null && r.children.isEmpty() && r.rewarded == 0
+            Text(if (newcomer) "Invité par un ami ? Saisissez son code" else "Partagez l'application : ${r.goal} amis = $months offert",
                 fontWeight = FontWeight.Bold)
             Text(if (r.progress > 0 || r.rewarded > 0) "${r.progress} / ${r.goal} amis validés · votre code : ${r.code}" else "Votre code : ${r.code} · accès à distance gratuit",
                 color = Brand.Muted, style = MaterialTheme.typography.bodySmall)

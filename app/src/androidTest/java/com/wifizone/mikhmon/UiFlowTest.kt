@@ -262,7 +262,7 @@ class UiFlowTest {
     /** Parrainage : code, partage de l'application, 4 amis = 1 mois, filleuls, saisie du code d'un parrain. */
     @Test fun referral() {
         routerReady()
-        Services.account.seedForTests(account("lifetime", listOf("distance-20261119-1m-f1")))
+        Services.account.seedForTests(account("lifetime"))
         open("parrainage", 3500, "21-parrainage")
         open(null, 5000, "22-accueil-parrainage")
     }
